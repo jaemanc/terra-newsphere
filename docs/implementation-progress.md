@@ -76,3 +76,9 @@ Hobby의 2 vCPU / 8GB / 32GB는 빌드 자원이다. 프런트만 Vercel에 두�
 - 구현 커밋: `7eb18af8806bb2a9a773d22ba21c9a1d205d2d46` (`feat: add globe UI and news ingestion pipeline`).
 - `git push origin main`이 성공했다. `git ls-remote origin refs/heads/main`으로 원격 SHA가 구현 커밋과 일치하는 것을 확인했고, 작업 트리는 깨끗했다.
 - 위 Git 권한 실패·미완료 기록은 과거 결과다. Git 커밋·푸시 작업은 완료했으며, 남은 구현 검증은 정적 지리 생성과 실제 서비스 연결/ARM64 실행 검증이다. 이번 요청에서는 이를 다시 실행하거나 서버를 배포하지 않았다.
+
+## 2026-10-13 정적 지리 번들 완료
+- `feature/static-geography`에서 실제 원본의 ADM1/ADM2 불일치를 확인했다. 부모 중첩률이 80% 미만인 ADM2는 임의 할당하지 않고 제외 목록을 manifest에 기록한다. 정상 경계 전체 생성을 중단하던 동작을 수정했다.
+- 생성 결과: 국가 경계 174개, 한국 ADM1 17개/ADM2 189개, 미확정 ADM2 39개. GeoJSON 합계 510727바이트. 버전·출처·라이선스·SHA256과 서버용 매핑을 함께 버전 관리한다.
+- 한국 ADM2 원본 라이선스는 CC BY 3.0임을 확인하고 출처 문서를 수정했다. 전체 구·군 지원으로 표현하지 않는다.
+- 실제 Redis/API와 Kafka/Spark 연결 검증은 다음 dev 통합 단계에서 한 번에 진행한다.
