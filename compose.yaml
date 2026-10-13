@@ -1,0 +1,130 @@
+name: terra-newsphere
+
+x-python-env: &python-env
+  REDIS_URL: redis://redis:6379/0
+  KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+  KAFKA_TOPIC: news.raw
+  GEOGRAPHY_DIR: /app/geo/generated
+
+services:
+  redis:
+    image: redis:7.4.5-alpine
+    command: [redis-server, /etc/redis/redis.conf]
+    volumes: [./redis/redis.conf:/etc/redis/redis.conf:ro]
+    mem_limit: 384m
+    cpus: 0.5
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  kafka:
+    image: apache/kafka:4.0.2
+    environment:
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_NUM_PARTITIONS: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      KAFKA_LOG_RETENTION_HOURS: 24
+      KAFKA_LOG_RETENTION_BYTES: 536870912
+      KAFKA_LOG_SEGMENT_BYTES: 67108864
+      KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 300000
+      KAFKA_HEAP_OPTS: -Xms256m -Xmx512m
+    volumes: [kafka-data:/var/lib/kafka/data]
+    mem_limit: 1g
+    cpus: 1
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD-SHELL, /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list > /dev/null]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  kafka-init:
+    image: apache/kafka:4.0.2
+    entrypoint: [sh, /app/create-topic.sh]
+    volumes: [./kafka/create-topic.sh:/app/create-topic.sh:ro]
+    depends_on:
+      kafka: {condition: service_healthy}
+    mem_limit: 512m
+
+  api:
+    image: terra-newsphere-api:0.1.0
+    build: {context: ., dockerfile: deploy/docker/python.Dockerfile, args: {ROLE: api}}
+    environment: *python-env
+    depends_on:
+      redis: {condition: service_healthy}
+    mem_limit: 256m
+    cpus: 0.5
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  collector:
+    image: terra-newsphere-collector:0.1.0
+    build: {context: ., dockerfile: deploy/docker/python.Dockerfile, args: {ROLE: collector}}
+    command: [python, /app/collector/main.py]
+    environment:
+      <<: *python-env
+      GDELT_QUERY: ${GDELT_QUERY:-(climate OR earthquake OR economy OR technology)}
+      COLLECT_INTERVAL_SECONDS: ${COLLECT_INTERVAL_SECONDS:-900}
+      RSS_URLS: ${RSS_URLS:-}
+      RSS_POLICY_FILE: /app/collector/rss-policy.json
+    profiles: [ingest]
+    depends_on:
+      kafka-init: {condition: service_completed_successfully}
+      redis: {condition: service_healthy}
+    mem_limit: 256m
+    cpus: 0.5
+    restart: unless-stopped
+
+  spark:
+    image: terra-newsphere-spark:0.1.0
+    build: {context: ., dockerfile: spark/Dockerfile}
+    environment:
+      <<: *python-env
+      SPARK_MASTER: local[1]
+      SPARK_CHECKPOINT: /var/lib/terra/checkpoints/news
+      SPARK_MAX_OFFSETS: ${SPARK_MAX_OFFSETS:-200}
+      SPARK_TRIGGER_SECONDS: ${SPARK_TRIGGER_SECONDS:-30}
+      SPARK_DRIVER_MEMORY: ${SPARK_DRIVER_MEMORY:-768m}
+    volumes: [spark-checkpoints:/var/lib/terra/checkpoints]
+    profiles: [ingest]
+    depends_on:
+      kafka-init: {condition: service_completed_successfully}
+      redis: {condition: service_healthy}
+    mem_limit: 2g
+    cpus: 1
+    restart: unless-stopped
+    stop_grace_period: 30s
+
+  frontend:
+    image: terra-newsphere-frontend:0.1.0
+    build: {context: ., dockerfile: frontend/Dockerfile}
+    ports: ["127.0.0.1:${WEB_PORT:-8080}:80"]
+    depends_on:
+      api: {condition: service_healthy}
+    mem_limit: 128m
+    cpus: 0.5
+    restart: unless-stopped
+
+volumes:
+  kafka-data:
+  spark-checkpoints:

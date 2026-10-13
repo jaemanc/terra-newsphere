@@ -1,0 +1,379 @@
+import React, { useEffect, useRef, useState } from 'react';
+import * as Cesium from 'cesium';
+import { initialLocale, messages } from './i18n.js';
+
+const FALLBACK = '/images/fallback.svg';
+
+function Thumbnail({ url, className }) {
+  return <img className={className} src={url || FALLBACK} alt="" loading="lazy"
+    referrerPolicy="no-referrer" onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = FALLBACK; }} />;
+}
+
+export default function App() {
+  const [locale, setLocale] = useState(initialLocale);
+  const text = messages[locale];
+  const [country, setCountry] = useState('');
+  const [adm1, setAdm1] = useState('');
+  const [adm2, setAdm2] = useState('');
+  const [countries, setCountries] = useState([]);
+  const [regions, setRegions] = useState({ adm1: [], adm2: [] });
+  const [items, setItems] = useState([]);
+  const [cursor, setCursor] = useState(null);
+  const [status, setStatus] = useState('loading');
+  const [view, setView] = useState(null);
+  const [refresh, setRefresh] = useState(0);
+  const [hover, setHover] = useState(null);
+  const [selected, setSelected] = useState(null);
+  const [preview, setPreview] = useState(null);
+  const [globeError, setGlobeError] = useState(false);
+  const [ready, setReady] = useState(false);
+  const host = useRef(null);
+  const viewer = useRef(null);
+  const markers = useRef(null);
+  const countryLayer = useRef(null);
+  const focusedCountry = useRef('');
+  const administrative = useRef(new Map());
+  const manifest = useRef(null);
+  const request = useRef(null);
+  const generation = useRef(0);
+  const bubble = useRef(null);
+
+  useEffect(() => {
+    document.documentElement.lang = locale;
+    try { localStorage.setItem('terra.locale', locale); } catch { /* Optional preference storage. */ }
+  }, [locale]);
+
+  useEffect(() => { focusedCountry.current = country; }, [country]);
+
+  useEffect(() => {
+    let alive = true;
+    let globe;
+    let handler;
+    let timer;
+    let removeMove;
+    try {
+      globe = new Cesium.Viewer(host.current, {
+        baseLayer: false, baseLayerPicker: false, geocoder: false, homeButton: false,
+        sceneModePicker: false, navigationHelpButton: false, animation: false, timeline: false,
+        fullscreenButton: false, infoBox: false, selectionIndicator: false,
+        skyBox: false, requestRenderMode: true, maximumRenderTimeChange: Infinity,
+      });
+      viewer.current = globe;
+      globe.scene.globe.baseColor = Cesium.Color.fromCssColorString('#103441');
+      globe.scene.backgroundColor = Cesium.Color.fromCssColorString('#071018');
+      globe.scene.globe.showGroundAtmosphere = true;
+      globe.scene.screenSpaceCameraController.minimumZoomDistance = 15000;
+      globe.scene.screenSpaceCameraController.maximumZoomDistance = 32000000;
+      globe.camera.setView({ destination: Cesium.Cartesian3.fromDegrees(55, 20, 22000000) });
+      const news = new Cesium.CustomDataSource('news');
+      news.clustering.enabled = true;
+      news.clustering.pixelRange = 48;
+      news.clustering.minimumClusterSize = 3;
+      news.clustering.clusterEvent.addEventListener((entities, cluster) => {
+        cluster.label.show = true;
+        cluster.label.text = String(entities.length);
+        cluster.label.font = 'bold 14px sans-serif';
+        cluster.label.fillColor = Cesium.Color.WHITE;
+        cluster.label.showBackground = true;
+        cluster.label.backgroundColor = Cesium.Color.fromCssColorString('#23574f');
+        cluster.billboard.show = false;
+        cluster.point.show = true;
+        cluster.point.pixelSize = 32;
+        cluster.point.color = Cesium.Color.fromCssColorString('#2a8173');
+        cluster.point.outlineColor = Cesium.Color.fromCssColorString('#8ce4d2');
+        cluster.point.outlineWidth = 1;
+      });
+      markers.current = news;
+      globe.dataSources.add(news);
+      Promise.all([
+        fetch('/geo/manifest.json').then((response) => { if (!response.ok) throw new Error(); return response.json(); }),
+        fetch('/geo/countries.geojson').then((response) => { if (!response.ok) throw new Error(); return response.json(); }),
+      ]).then(async ([index, boundaries]) => {
+        if (!alive) return;
+        manifest.current = index;
+        setCountries(boundaries.features.map((feature) => feature.properties).sort((a, b) => a.name.localeCompare(b.name)));
+        const layer = await Cesium.GeoJsonDataSource.load(boundaries, {
+          stroke: Cesium.Color.fromCssColorString('#51948f').withAlpha(0.65), strokeWidth: 1,
+          fill: Cesium.Color.fromCssColorString('#285b53').withAlpha(0.55), clampToGround: true,
+        });
+        if (!alive) return;
+        countryLayer.current = layer;
+        globe.dataSources.add(layer);
+        globe.scene.requestRender();
+      }).catch(() => { if (alive) setGlobeError('geography'); });
+      handler = new Cesium.ScreenSpaceEventHandler(globe.scene.canvas);
+      handler.setInputAction((movement) => {
+        const entity = globe.scene.pick(movement.endPosition)?.id;
+        setHover(entity?.news ? { item: entity.news, x: movement.endPosition.x, y: movement.endPosition.y } : null);
+        globe.scene.canvas.style.cursor = entity?.news ? 'pointer' : 'grab';
+      }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+      handler.setInputAction((movement) => {
+        const entity = globe.scene.pick(movement.position)?.id;
+        if (entity?.news) {
+          setSelected({ item: entity.news, location: entity.newsLocation });
+          setHover(null);
+        } else if (entity?.properties?.country_code) {
+          const code = entity.properties.country_code.getValue();
+          setCountry(code);
+          setAdm1(''); setAdm2(''); setSelected(null);
+        } else {
+          setSelected(null);
+        }
+      }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+      const updateView = () => {
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+          if (!alive) return;
+          const rectangle = globe.camera.computeViewRectangle();
+          const bounds = rectangle ? [rectangle.west, rectangle.south, rectangle.east, rectangle.north]
+            .map(Cesium.Math.toDegrees).map((value) => value.toFixed(4)).join(',') : null;
+          setView({ bbox: bounds, height: globe.camera.positionCartographic.height });
+          if (globe.camera.positionCartographic.height < 3000000) {
+            const center = new Cesium.Cartesian2(globe.canvas.clientWidth / 2, globe.canvas.clientHeight / 2);
+            const entity = globe.scene.pick(center)?.id;
+            const code = entity?.properties?.country_code?.getValue() || entity?.newsLocation?.country_code;
+            if (code && code !== focusedCountry.current) {
+              setCountry(code); setAdm1(''); setAdm2('');
+            }
+          }
+        }, 450);
+      };
+      removeMove = globe.camera.moveEnd.addEventListener(updateView);
+      updateView();
+      setReady(true);
+    } catch {
+      setGlobeError('webgl');
+    }
+    return () => {
+      alive = false; clearTimeout(timer); removeMove?.(); handler?.destroy();
+      if (globe && !globe.isDestroyed()) globe.destroy();
+      viewer.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!ready || !view) return;
+    let alive = true;
+    const level = view.height < 300000 ? 'adm2' : view.height < 3000000 ? 'adm1' : null;
+    for (const layer of administrative.current.values()) layer.show = false;
+    setRegions({ adm1: [], adm2: [] });
+    const files = manifest.current?.administrative[country];
+    if (!files || !level) { viewer.current?.scene.requestRender(); return; }
+    (async () => {
+      const next = { adm1: [], adm2: [] };
+      for (const current of level === 'adm2' ? ['adm1', 'adm2'] : ['adm1']) {
+        if (!files[current]) continue;
+        const key = `${country}:${current}`;
+        let layer = administrative.current.get(key);
+        if (!layer) {
+          const response = await fetch(`/geo/${files[current]}`);
+          if (!response.ok) throw new Error('Boundary unavailable');
+          const data = await response.json();
+          next[current] = data.features.map((feature) => feature.properties);
+          layer = await Cesium.GeoJsonDataSource.load(data, {
+            stroke: Cesium.Color.fromCssColorString(current === 'adm1' ? '#8cbaa8' : '#bac9ac').withAlpha(0.75),
+            strokeWidth: 1, fill: Cesium.Color.fromCssColorString('#366859').withAlpha(0.08), clampToGround: true,
+          });
+          if (!alive || !viewer.current) return;
+          // Keep only the selected country's detail; never accumulate global ADM2 geometry.
+          administrative.current.set(key, layer);
+          await viewer.current.dataSources.add(layer);
+          layer.options = next[current];
+        } else next[current] = layer.options;
+        if (!alive) return;
+        layer.show = true;
+      }
+      if (alive) { setRegions(next); viewer.current?.scene.requestRender(); }
+      for (const [key, layer] of administrative.current) {
+        if (!key.startsWith(`${country}:`)) {
+          viewer.current.dataSources.remove(layer, true);
+          administrative.current.delete(key);
+        }
+      }
+    })().catch(() => { if (alive) setGlobeError('geography'); });
+    return () => { alive = false; };
+  }, [country, view?.height, ready]);
+
+  async function loadNews(nextCursor = 0, append = false) {
+    request.current?.abort();
+    const controller = new AbortController();
+    request.current = controller;
+    const current = ++generation.current;
+    setStatus('loading');
+    const params = new URLSearchParams({ limit: '100', cursor: String(nextCursor) });
+    if (country) params.set('country', country);
+    if (adm1) params.set('adm1', adm1);
+    if (adm2) params.set('adm2', adm2);
+    if (view?.bbox) params.set('bbox', view.bbox);
+    try {
+      const response = await fetch(`/api/news/markers?${params}`, { signal: controller.signal, cache: 'no-store' });
+      if (!response.ok) throw new Error();
+      const data = await response.json();
+      if (current !== generation.current) return;
+      setItems((previous) => {
+        const combined = append ? [...previous, ...data.items] : data.items;
+        // ponytail: bounded client list; refine the region when more than 500 stories are needed.
+        return [...new Map(combined.map((item) => [item.news_id, item])).values()].slice(-500);
+      });
+      setCursor(data.next_cursor);
+      setStatus('ok');
+    } catch (error) {
+      if (error.name !== 'AbortError' && current === generation.current) setStatus('error');
+    }
+  }
+
+  useEffect(() => {
+    if (!view) return;
+    setHover(null);
+    loadNews();
+    return () => { request.current?.abort(); };
+  }, [country, adm1, adm2, view?.bbox, refresh]);
+
+  useEffect(() => {
+    const timer = setInterval(() => setRefresh((value) => value + 1), 60000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!items.length) return;
+    const delay = Math.max(0, Math.min(...items.map((item) => Date.parse(item.expires_at))) - Date.now());
+    const timer = setTimeout(() => {
+      setItems((previous) => previous.filter((item) => Date.parse(item.expires_at) > Date.now()));
+      setSelected(null); setHover(null);
+    }, delay + 1);
+    return () => clearTimeout(timer);
+  }, [items]);
+
+  useEffect(() => {
+    if (!ready || !markers.current) return;
+    markers.current.entities.removeAll();
+    for (const item of items) {
+      item.locations.forEach((location, index) => {
+        const entity = markers.current.entities.add({ id: `${item.news_id}:${index}`,
+          position: Cesium.Cartesian3.fromDegrees(location.longitude, location.latitude),
+          point: { pixelSize: 9, color: Cesium.Color.fromCssColorString(item.is_demo ? '#e9c580' : '#8ce4d2'),
+            outlineColor: Cesium.Color.fromCssColorString('#143e3c'), outlineWidth: 2,
+            heightReference: Cesium.HeightReference.CLAMP_TO_GROUND },
+        });
+        entity.news = item; entity.newsLocation = location;
+      });
+    }
+    viewer.current?.scene.requestRender();
+  }, [items, ready]);
+
+  useEffect(() => {
+    setPreview(null);
+    if (!selected) return;
+    const controller = new AbortController();
+    fetch(`/api/news/${selected.item.news_id}`, { signal: controller.signal, cache: 'no-store' })
+      .then((response) => { if (!response.ok) throw new Error(); return response.json(); })
+      .then(setPreview).catch((error) => { if (error.name !== 'AbortError') setPreview({ error: true }); });
+    return () => controller.abort();
+  }, [selected]);
+
+  useEffect(() => {
+    if (!selected) return;
+    const timer = setTimeout(() => { setSelected(null); setPreview(null); },
+      Math.max(0, Date.parse(selected.item.expires_at) - Date.now()));
+    return () => clearTimeout(timer);
+  }, [selected]);
+
+  useEffect(() => {
+    const globe = viewer.current;
+    if (!selected || !globe || !bubble.current) return;
+    const position = Cesium.Cartesian3.fromDegrees(selected.location.longitude, selected.location.latitude);
+    const update = () => {
+      const element = bubble.current;
+      if (!element) return;
+      const point = Cesium.SceneTransforms.worldToWindowCoordinates(globe.scene, position);
+      const visible = new Cesium.EllipsoidalOccluder(Cesium.Ellipsoid.WGS84, globe.camera.position).isPointVisible(position);
+      element.style.visibility = point && visible ? 'visible' : 'hidden';
+      if (point) {
+        element.style.left = `${Math.max(12, Math.min(globe.canvas.clientWidth - element.offsetWidth - 12, point.x + 16))}px`;
+        element.style.top = `${Math.max(12, Math.min(globe.canvas.clientHeight - element.offsetHeight - 12, point.y - 40))}px`;
+      }
+    };
+    const remove = globe.scene.postRender.addEventListener(update);
+    update(); globe.scene.requestRender();
+    return remove;
+  }, [selected, preview]);
+
+  const title = (item) => item.translations?.[locale]?.title || item.title;
+  const content = preview && !preview.error ? preview.content.translations?.[locale] || preview.content : null;
+  const shownItems = items.filter((item) => item.locations.length);
+
+  function chooseCountry(code) {
+    setCountry(code); setAdm1(''); setAdm2(''); setSelected(null);
+    if (code && countryLayer.current) {
+      const entity = countryLayer.current.entities.values.find((item) => item.properties?.country_code?.getValue() === code);
+      if (entity) viewer.current.flyTo(entity, { duration: 1.2 });
+    }
+  }
+
+  return <main className="app">
+    <header className="topbar">
+      <a className="brand" href="/" aria-label="TerraNewsphere"><span className="brand-icon">◎</span> TERRA<span>NEWS</span>PHERE</a>
+      <div className="top-actions"><span className="live-indicator"><i />{text.live}</span>
+        <select aria-label={text.language} value={locale} onChange={(event) => setLocale(event.target.value)}>
+          <option value="en">English</option><option value="ko">한국어</option>
+        </select></div>
+    </header>
+    <div className="workspace">
+      <aside className="sidebar">
+        <div className="eyebrow">{text.eyebrow}</div>
+        <h1>{text.tagline}</h1><p className="subtitle">{text.subtitle}</p>
+        <div className="stats"><div><strong>{shownItems.length.toString().padStart(2, '0')}</strong><span>{text.count}</span></div>
+          <div><strong>168<span>h</span></strong><span>{text.days}</span></div></div>
+        <label className="region-label" htmlFor="country">{text.region}</label>
+        <select id="country" value={country} onChange={(event) => chooseCountry(event.target.value)}>
+          <option value="">{text.all}</option>{countries.map((item) => <option key={item.country_code} value={item.country_code}>{item.name}</option>)}
+        </select>
+        {regions.adm1.length > 0 && <select aria-label="ADM1" value={adm1} onChange={(event) => { setAdm1(event.target.value); setAdm2(''); }}>
+          <option value="">ADM1 · {text.all}</option>{regions.adm1.map((item) => <option key={item.region_id} value={item.region_id}>{item.name}</option>)}
+        </select>}
+        {adm1 && regions.adm2.length > 0 && <select aria-label="ADM2" value={adm2} onChange={(event) => setAdm2(event.target.value)}>
+          <option value="">ADM2 · {text.all}</option>{regions.adm2.filter((item) => item.adm1_id === adm1).map((item) => <option key={item.region_id} value={item.region_id}>{item.name}</option>)}
+        </select>}
+        <div className="feed-heading"><span>{text.live}</span><button onClick={() => setRefresh((value) => value + 1)} aria-label={text.refresh}>↻</button></div>
+        <div className="feed" aria-live="polite">
+          {status === 'loading' && <p className="status">{text.loading}</p>}
+          {status === 'error' && <p className="status error">{text.unavailable}</p>}
+          {status === 'ok' && !shownItems.length && <p className="status">{text.empty}</p>}
+          {shownItems.map((item) => <button className={`story ${selected?.item.news_id === item.news_id ? 'active' : ''}`} key={item.news_id}
+            onClick={() => {
+              const location = item.locations[0]; setSelected({ item, location });
+              viewer.current?.camera.flyTo({ destination: Cesium.Cartesian3.fromDegrees(location.longitude, location.latitude, 2200000), duration: 1.2 });
+            }}>
+            <div className="story-meta"><span>{item.locations[0].country_code}</span><span>{item.is_demo ? text.demo : item.publisher}</span></div>
+            <div className="story-body"><h2>{title(item)}</h2><Thumbnail url={item.thumbnail_url} /></div>
+          </button>)}
+          {cursor !== null && <button className="more" disabled={status === 'loading'} onClick={() => loadNews(cursor, true)}>{text.more}</button>}
+        </div>
+        <a className="attribution" href="/geo/manifest.json" target="_blank" rel="noopener noreferrer">{text.attribution} ↗</a>
+      </aside>
+      <section className="globe-stage" aria-label="Interactive news globe">
+        <div ref={host} className="globe-layer" />
+        <div className="globe-top"><span className="coordinate-label">EARTH / 01</span><button onClick={() => {
+          chooseCountry(''); viewer.current?.camera.flyTo({ destination: Cesium.Cartesian3.fromDegrees(55, 20, 22000000), duration: 1.2 });
+        }} aria-label={text.reset}>◎</button></div>
+        {globeError && <p className="globe-error">{globeError === 'webgl' ? text.globeError : text.geographyError}</p>}
+        {hover && <div className="hover-preview" style={{ left: Math.min(hover.x + 15, (host.current?.clientWidth || 500) - 270), top: Math.max(10, hover.y - 55) }}>
+          <Thumbnail url={hover.item.thumbnail_url} /><span>{title(hover.item)}</span>
+        </div>}
+        {selected && <article ref={bubble} className="news-bubble" aria-live="polite">
+          <button className="close" onClick={() => setSelected(null)} aria-label={text.close}>×</button>
+          <Thumbnail url={preview?.content?.thumbnail_url || selected.item.thumbnail_url} className="bubble-image" />
+          <div className="bubble-body"><div className="story-meta"><span>{selected.item.publisher}</span>{selected.item.is_demo && <span>{text.demo}</span>}</div>
+            <h2>{content?.title || title(selected.item)}</h2>
+            {preview?.error ? <p>{text.unavailable}</p> : <p>{content?.summary || (preview ? text.noSummary : text.loading)}</p>}
+            <small>{selected.location.coordinate_source === 'capital_fallback' ? text.capital : text.centroid}</small>
+            {selected.location.association_kind === 'mentioned' && <small>{text.mentioned}</small>}
+            {preview && !preview.error && <><small>{text.original}: {preview.content.language}</small>
+              <a href={preview.source.url} target="_blank" rel="noopener noreferrer">{text.source} ↗</a></>}
+          </div>
+        </article>}
+        <div className="globe-bottom"><span>{text.instruction}</span><span className="view-count">{shownItems.length} {text.stories}</span></div>
+      </section>
+    </div>
+  </main>;
+}

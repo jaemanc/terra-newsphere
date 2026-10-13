@@ -1,0 +1,22 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: terra-newsphere
+resources:
+  - namespace.yaml
+  - ../../kafka
+  - ../../redis
+  - ../../spark
+  - api.yaml
+  - collector.yaml
+  - frontend.yaml
+  - network.yaml
+  - ingress.yaml
+configMapGenerator:
+  - name: terra-config
+    literals:
+      - REDIS_URL=redis://redis:6379/0
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - KAFKA_TOPIC=news.raw
+      - GEOGRAPHY_DIR=/app/geo/generated
+      - COLLECT_INTERVAL_SECONDS=900
+      - GDELT_QUERY=(climate OR earthquake OR economy OR technology)
