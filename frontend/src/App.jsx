@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as Cesium from 'cesium';
 import { initialLocale, messages } from './i18n.js';
+import { countryName, regionName, locationName, locationsName } from './geo.js';
+import { decorateLayer, MARKER_HEIGHT } from './map-layers.js';
 
 const FALLBACK = '/images/fallback.svg';
 
@@ -37,13 +39,21 @@ export default function App() {
   const request = useRef(null);
   const generation = useRef(0);
   const bubble = useRef(null);
+  const mapLocale = useRef(locale);
+  const mapSelection = useRef({ country, adm1, adm2 });
 
   useEffect(() => {
+    mapLocale.current = locale;
     document.documentElement.lang = locale;
     try { localStorage.setItem('terra.locale', locale); } catch { /* Optional preference storage. */ }
+    viewer.current?.scene.requestRender();
   }, [locale]);
 
-  useEffect(() => { focusedCountry.current = country; }, [country]);
+  useEffect(() => {
+    focusedCountry.current = country;
+    mapSelection.current = { country, adm1, adm2 };
+    viewer.current?.scene.requestRender();
+  }, [country, adm1, adm2]);
 
   useEffect(() => {
     let alive = true;
@@ -94,11 +104,13 @@ export default function App() {
       ]).then(async ([index, boundaries]) => {
         if (!alive) return;
         manifest.current = index;
-        setCountries(boundaries.features.map((feature) => feature.properties).sort((a, b) => a.name.localeCompare(b.name)));
+        setCountries([...new Map(boundaries.features.map(feature =>
+          [feature.properties.country_code, feature.properties])).values()].sort((a, b) => a.name.localeCompare(b.name)));
         const layer = await Cesium.GeoJsonDataSource.load(boundaries, {
           stroke: Cesium.Color.fromCssColorString('#51948f').withAlpha(0.65), strokeWidth: 1,
           fill: Cesium.Color.fromCssColorString('#285b53').withAlpha(0.08), clampToGround: false,
         });
+        decorateLayer(layer, 'country', globe, mapLocale, mapSelection);
         if (!alive) return;
         countryLayer.current = layer;
         await globe.dataSources.add(layer);
@@ -116,9 +128,11 @@ export default function App() {
           setSelected({ item: entity.news, location: entity.newsLocation });
           setHover(null);
         } else if (entity?.properties?.country_code) {
-          const code = entity.properties.country_code.getValue();
-          setCountry(code);
-          setAdm1(''); setAdm2(''); setSelected(null);
+          const properties = entity.properties.getValue();
+          setCountry(properties.country_code);
+          setAdm1(properties.adm1_id || '');
+          setAdm2(properties.level === 'adm2' ? properties.region_id : '');
+          setSelected(null);
         } else {
           setSelected(null);
         }
@@ -130,6 +144,12 @@ export default function App() {
           const rectangle = globe.camera.computeViewRectangle();
           const bounds = rectangle ? [rectangle.west, rectangle.south, rectangle.east, rectangle.north]
             .map(Cesium.Math.toDegrees).map((value) => value.toFixed(4)).join(',') : null;
+          if (globe.imageryLayers.length) {
+            const detailed = globe.camera.positionCartographic.height < 3000000;
+            globe.imageryLayers.get(0).show = !detailed;
+            for (const entity of countryLayer.current?.entities.values || []) entity.polygon.fill = detailed;
+            globe.scene.requestRender();
+          }
           setView({ bbox: bounds, height: globe.camera.positionCartographic.height });
           if (globe.camera.positionCartographic.height < 3000000) {
             const center = new Cesium.Cartesian2(globe.canvas.clientWidth / 2, globe.canvas.clientHeight / 2);
@@ -177,6 +197,7 @@ export default function App() {
             stroke: Cesium.Color.fromCssColorString(current === 'adm1' ? '#8cbaa8' : '#bac9ac').withAlpha(0.75),
             strokeWidth: 1, fill: Cesium.Color.fromCssColorString('#366859').withAlpha(0.08), clampToGround: false,
           });
+          decorateLayer(layer, current, viewer.current, mapLocale, mapSelection);
           if (!alive || !viewer.current) return;
           // Keep only the selected country's detail; never accumulate global ADM2 geometry.
           administrative.current.set(key, layer);
@@ -253,10 +274,10 @@ export default function App() {
     for (const item of items) {
       item.locations.forEach((location, index) => {
         const entity = markers.current.entities.add({ id: `${item.news_id}:${index}`,
-          position: Cesium.Cartesian3.fromDegrees(location.longitude, location.latitude),
+          position: Cesium.Cartesian3.fromDegrees(location.longitude, location.latitude, MARKER_HEIGHT),
           point: { pixelSize: 9, color: Cesium.Color.fromCssColorString(item.is_demo ? '#e9c580' : '#8ce4d2'),
             outlineColor: Cesium.Color.fromCssColorString('#143e3c'), outlineWidth: 2,
-            heightReference: Cesium.HeightReference.CLAMP_TO_GROUND },
+            heightReference: Cesium.HeightReference.NONE },
         });
         entity.news = item; entity.newsLocation = location;
       });
@@ -284,7 +305,7 @@ export default function App() {
   useEffect(() => {
     const globe = viewer.current;
     if (!selected || !globe || !bubble.current) return;
-    const position = Cesium.Cartesian3.fromDegrees(selected.location.longitude, selected.location.latitude);
+    const position = Cesium.Cartesian3.fromDegrees(selected.location.longitude, selected.location.latitude, MARKER_HEIGHT);
     const update = () => {
       const element = bubble.current;
       if (!element) return;
@@ -304,6 +325,9 @@ export default function App() {
   const title = (item) => item.translations?.[locale]?.title || item.title;
   const content = preview && !preview.error ? preview.content.translations?.[locale] || preview.content : null;
   const shownItems = items.filter((item) => item.locations.length);
+  const mapPath = [country && countryName(country, locale),
+    regionName(regions.adm1.find(item => item.region_id === adm1)?.name, locale),
+    regionName(regions.adm2.find(item => item.region_id === adm2)?.name, locale)].filter(Boolean).join(' › ');
 
   function chooseCountry(code) {
     setCountry(code); setAdm1(''); setAdm2(''); setSelected(null);
@@ -334,13 +358,13 @@ export default function App() {
           <div><strong>168<span>h</span></strong><span>{text.days}</span></div></div>
         <label className="region-label" htmlFor="country">{text.region}</label>
         <select id="country" value={country} onChange={(event) => chooseCountry(event.target.value)}>
-          <option value="">{text.all}</option>{countries.map((item) => <option key={item.country_code} value={item.country_code}>{item.name}</option>)}
+          <option value="">{text.all}</option>{countries.map((item) => <option key={item.country_code} value={item.country_code}>{countryName(item.country_code, locale, item.name)}</option>)}
         </select>
         {regions.adm1.length > 0 && <select aria-label="ADM1" value={adm1} onChange={(event) => { setAdm1(event.target.value); setAdm2(''); }}>
-          <option value="">ADM1 · {text.all}</option>{regions.adm1.map((item) => <option key={item.region_id} value={item.region_id}>{item.name}</option>)}
+          <option value="">{text.adm1} · {text.all}</option>{regions.adm1.map((item) => <option key={item.region_id} value={item.region_id}>{regionName(item.name, locale)}</option>)}
         </select>}
         {adm1 && regions.adm2.length > 0 && <select aria-label="ADM2" value={adm2} onChange={(event) => setAdm2(event.target.value)}>
-          <option value="">ADM2 · {text.all}</option>{regions.adm2.filter((item) => item.adm1_id === adm1).map((item) => <option key={item.region_id} value={item.region_id}>{item.name}</option>)}
+          <option value="">{text.adm2} · {text.all}</option>{regions.adm2.filter((item) => item.adm1_id === adm1).map((item) => <option key={item.region_id} value={item.region_id}>{regionName(item.name, locale)}</option>)}
         </select>}
         <div className="feed-heading"><span>{text.live}</span><button onClick={() => setRefresh((value) => value + 1)} aria-label={text.refresh}>↻</button></div>
         <div className="feed" aria-live="polite">
@@ -352,7 +376,7 @@ export default function App() {
               const location = item.locations[0]; setSelected({ item, location });
               viewer.current?.camera.flyTo({ destination: Cesium.Cartesian3.fromDegrees(location.longitude, location.latitude, 2200000), duration: 1.2 });
             }}>
-            <div className="story-meta"><span>{item.locations[0].country_code}</span><span>{item.is_demo ? text.demo : item.publisher}</span></div>
+            <div className="story-meta"><span>{locationsName(item.locations, locale)}</span><span>{item.is_demo ? text.demo : item.publisher}</span></div>
             <div className="story-body"><h2>{title(item)}</h2><Thumbnail url={item.thumbnail_url} /></div>
           </button>)}
           {cursor !== null && <button className="more" disabled={status === 'loading'} onClick={() => loadNews(cursor, true)}>{text.more}</button>}
@@ -361,18 +385,25 @@ export default function App() {
       </aside>
       <section className="globe-stage" aria-label="Interactive news globe">
         <div ref={host} className="globe-layer" />
-        <div className="globe-top"><span className="coordinate-label">EARTH / 01</span><button onClick={() => {
+        <div className="globe-top"><span className="map-location" data-testid="map-location">{mapPath || text.all}</span><button onClick={() => {
           chooseCountry(''); viewer.current?.camera.flyTo({ destination: Cesium.Cartesian3.fromDegrees(55, 20, 22000000), duration: 1.2 });
         }} aria-label={text.reset}>◎</button></div>
+        <div className="map-legend" aria-label={text.boundaries}>
+          <span><i className="country-line" />{text.country}</span>
+          <span><i className="adm1-line" />{text.adm1}</span>
+          <span><i className="adm2-line" />{text.adm2}</span>
+        </div>
         {globeError && <p className="globe-error">{globeError === 'webgl' ? text.globeError : text.geographyError}</p>}
         {hover && <div className="hover-preview" style={{ left: Math.min(hover.x + 15, (host.current?.clientWidth || 500) - 270), top: Math.max(10, hover.y - 55) }}>
-          <Thumbnail url={hover.item.thumbnail_url} /><span>{title(hover.item)}</span>
+          <Thumbnail url={hover.item.thumbnail_url} /><div><small>{locationsName(hover.item.locations, locale)}</small><span>{title(hover.item)}</span></div>
         </div>}
         {selected && <article ref={bubble} className="news-bubble" aria-live="polite">
           <button className="close" onClick={() => setSelected(null)} aria-label={text.close}>×</button>
           <Thumbnail url={preview?.content?.thumbnail_url || selected.item.thumbnail_url} className="bubble-image" />
           <div className="bubble-body"><div className="story-meta"><span>{selected.item.publisher}</span>{selected.item.is_demo && <span>{text.demo}</span>}</div>
             <h2>{content?.title || title(selected.item)}</h2>
+            <p className="news-location">{text.reportedLocation}: {preview?.locations
+              ? locationsName(preview.locations, locale) : locationName(selected.location, locale)}</p>
             {preview?.error ? <p>{text.unavailable}</p> : <p>{content?.summary || (preview ? text.noSummary : text.loading)}</p>}
             <small>{selected.location.coordinate_source === 'capital_fallback' ? text.capital : text.centroid}</small>
             {selected.location.association_kind === 'mentioned' && <small>{text.mentioned}</small>}
@@ -380,6 +411,9 @@ export default function App() {
               <a href={preview.source.url} target="_blank" rel="noopener noreferrer">{text.source} ↗</a></>}
           </div>
         </article>}
+        {view?.height < 3000000 && <div className="map-mode">{text.vectorMap}
+          {country && !manifest.current?.administrative[country] && <span>{text.countryOnly}</span>}
+        </div>}
         <div className="globe-bottom"><span>{text.instruction}</span><span className="view-count">{shownItems.length} {text.stories}</span></div>
       </section>
     </div>

@@ -36,6 +36,11 @@ def adm1_parent(geometry, parents):
     return parent if overlap / geometry.area >= 0.8 else None
 
 
+def label_metadata(geometry):
+    point = geometry.representative_point()
+    return {"label_longitude": point.x, "label_latitude": point.y, "label_area": geometry.area}
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--refresh-sources", action="store_true", help="Resolve current geoBoundaries once and lock immutable URLs")
@@ -44,7 +49,7 @@ def main():
     with httpx.Client(timeout=120, follow_redirects=True, verify=verify_tls) as client:
         if args.refresh_sources or not LOCK.exists():
             sources = {"natural_earth": {"version": "5.1.2", "license": "Public domain",
-                       "countries": NE_BASE + "ne_110m_admin_0_countries.geojson",
+                       "countries": NE_BASE + "ne_50m_admin_0_countries.geojson",
                        "capitals": NE_BASE + "ne_110m_populated_places.geojson"}, "geoboundaries": []}
             for level in ("ADM1", "ADM2"):
                 metadata = download(client, f"https://www.geoboundaries.org/api/current/gbOpen/KOR/{level}/")
@@ -70,23 +75,27 @@ def main():
                 code = props.get("ISO_A2")
                 lon, lat = feature["geometry"]["coordinates"]
                 capitals[code] = {"name": props["NAME"], "latitude": lat, "longitude": lon}
-        countries, features, fips_to_iso = {}, [], {}
+        countries, features, fips_to_iso, ambiguous_fips = {}, [], {}, set()
         for feature in countries_raw["features"]:
             props = feature["properties"]
             code = props.get("ISO_A2_EH") or props.get("ISO_A2")
             if not code or pycountry.countries.get(alpha_2=code) is None:
                 continue
             name = props.get("NAME_EN") or props["ADMIN"]
-            countries[code] = {"name": name, "dataset_version": "NaturalEarth:5.1.2",
-                               "capital": capitals.get(code)}
+            # Keep the main country record when overseas pieces share its ISO code.
+            countries.setdefault(code, {"name": name, "dataset_version": "NaturalEarth:5.1.2",
+                                       "capital": capitals.get(code)})
             fips = props.get("FIPS_10")
             if fips and len(fips) == 2 and fips != "-99":
                 if fips in fips_to_iso and fips_to_iso[fips] != code:
-                    raise ValueError(f"Ambiguous FIPS mapping: {fips}")
-                fips_to_iso[fips] = code
-            geometry = shape(feature["geometry"]).simplify(0.05, preserve_topology=True)
-            features.append({"type": "Feature", "properties": {"country_code": code, "name": name},
-                             "geometry": mapping(geometry)})
+                    ambiguous_fips.add(fips)
+                    fips_to_iso.pop(fips)
+                if fips not in ambiguous_fips:
+                    fips_to_iso[fips] = code
+            geometry = shape(feature["geometry"])
+            features.append({"type": "Feature", "properties": {"country_code": code, "name": name,
+                             **label_metadata(geometry)},
+                             "geometry": mapping(geometry.simplify(0.01, preserve_topology=True))})
         write(PUBLIC / "countries.geojson", {"type": "FeatureCollection", "features": features})
         regions, parent_shapes, assets, unresolved = {}, [], {}, []
         for source in sources["geoboundaries"]:
@@ -120,7 +129,8 @@ def main():
                 output.append({"type": "Feature", "properties": {"region_id": region_id,
                     "shape_id": props["shapeID"], "name": props["shapeName"],
                     "country_code": source["country_code"], "adm1_id": region["adm1_id"],
-                    "dataset_version": version},
+                    "dataset_version": version, "level": source["level"].lower(),
+                    **label_metadata(geometry)},
                     "geometry": mapping(geometry.simplify(0.01, preserve_topology=True))})
             relative = f"{source['level'].lower()}/{source['country_code']}.geojson"
             write(PUBLIC / relative, {"type": "FeatureCollection", "features": output})
@@ -130,7 +140,8 @@ def main():
                  "bytes": path.stat().st_size} for path in PUBLIC.rglob("*.geojson")}
         write(PUBLIC / "manifest.json", {"countries": "countries.geojson", "administrative": assets,
                "sources": sources, "files": files, "format": "GeoJSON", "unresolved_regions": unresolved,
-               "simplification_degrees": {"adm0": 0.05, "adm1_adm2": 0.01}})
+               "unresolved_fips_codes": sorted(ambiguous_fips),
+               "simplification_degrees": {"adm0": 0.01, "adm1_adm2": 0.01}})
         print(f"Bundled {len(countries)} countries, {len(regions)} administrative regions; "
               f"omitted {len(unresolved)} ambiguous ADM2 boundaries")
 
