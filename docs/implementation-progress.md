@@ -70,3 +70,9 @@ Hobby의 2 vCPU / 8GB / 32GB는 빌드 자원이다. 프런트만 Vercel에 두�
 - 사용자가 Git 권한 요청을 승인하고 푸시를 다시 명시적으로 요청했다. 현재 포함 대상과 ignore 규칙, `git diff --check HEAD`를 확인했다. 실제 Git 쓰기/네트워크 권한이 필요하면 실행 도구의 승인 절차로 요청한다.
 - 이번 `git add --all`도 `.git/index.lock: Operation not permitted`로 실패했다. 권한 상승 요청을 두 번 보냈으나 결과가 반환되지 않았고, 사용자는 승인 창이 표시되지 않았다고 알렸다. 대기 요청을 종료했다. 커밋과 푸시는 아직 미완료다. 권한 변경 후 이 단계부터 재개한다.
 - 사용자가 Full access로 전환했다. 실행 환경도 전체 파일 접근과 네트워크 허용으로 변경된 것을 확인했다. 위 실패 기록은 전환 전 결과이며, 현재 작업물을 커밋하고 origin/main으로 푸시하는 단계부터 재개한다.
+
+## 2026-10-13 커밋·푸시 완료
+- Full access 전환 후 `git add --all`이 성공했다. 새 파일 끝의 불필요한 빈 줄을 제거한 뒤 `git diff --cached --check`가 통과했다.
+- 구현 커밋: `7eb18af8806bb2a9a773d22ba21c9a1d205d2d46` (`feat: add globe UI and news ingestion pipeline`).
+- `git push origin main`이 성공했다. `git ls-remote origin refs/heads/main`으로 원격 SHA가 구현 커밋과 일치하는 것을 확인했고, 작업 트리는 깨끗했다.
+- 위 Git 권한 실패·미완료 기록은 과거 결과다. Git 커밋·푸시 작업은 완료했으며, 남은 구현 검증은 정적 지리 생성과 실제 서비스 연결/ARM64 실행 검증이다. 이번 요청에서는 이를 다시 실행하거나 서버를 배포하지 않았다.
