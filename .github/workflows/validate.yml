@@ -1,0 +1,58 @@
+name: Validate
+
+on:
+  pull_request:
+    branches: [dev, prd]
+  push:
+    branches: [dev, prd]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  branch-policy:
+    name: Branch policy
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Check merge direction
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.base_ref }}
+          HEAD: ${{ github.head_ref }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ "$EVENT" != pull_request ]; then exit 0; fi
+          case "$BASE:$HEAD" in
+            dev:feature/*) ;;
+            prd:dev) test "$HEAD_REPO" = "$REPO" ;;
+            *) echo 'Merge feature/* into dev, then dev into prd.'; exit 1 ;;
+          esac
+
+  validate:
+    name: Validate
+    needs: branch-policy
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22.16.0
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: astral-sh/setup-uv@d0d8abe699bfb85fec6de9f7adb5ae17292296ff # v6
+        with:
+          version: 0.12.9
+      - name: Install locked dependencies
+        run: |
+          uv sync --frozen --python 3.12 --extra api --extra collector --extra dev
+          npm --prefix frontend ci
+      - name: Validate API, retention, globe build and ARM64 pipeline
+        run: .venv/bin/python scripts/verify.py --containers
+

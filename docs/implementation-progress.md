@@ -76,3 +76,11 @@ Hobby의 2 vCPU / 8GB / 32GB는 빌드 자원이다. 프런트만 Vercel에 두�
 - 구현 커밋: `7eb18af8806bb2a9a773d22ba21c9a1d205d2d46` (`feat: add globe UI and news ingestion pipeline`).
 - `git push origin main`이 성공했다. `git ls-remote origin refs/heads/main`으로 원격 SHA가 구현 커밋과 일치하는 것을 확인했고, 작업 트리는 깨끗했다.
 - 위 Git 권한 실패·미완료 기록은 과거 결과다. Git 커밋·푸시 작업은 완료했으며, 남은 구현 검증은 정적 지리 생성과 실제 서비스 연결/ARM64 실행 검증이다. 이번 요청에서는 이를 다시 실행하거나 서버를 배포하지 않았다.
+
+## 2026-10-13 dev/prd 브랜치와 로컬 테스트 재개
+- 사용자 요청: 기능별 `feature/* → dev → prd`, dev 통합 테스트, prd 운영 버전. 운영 서버가 없으므로 이번에는 로컬로 실행한다.
+- `dev`, `prd`를 기존 커밋에서 생성하고 원격에 push했다. GitHub 기본 브랜치를 dev로 변경하고 merge commit 방식을 사용한다. main은 과거 이력으로 보존한다.
+- `feature/branch-workflow`에서 브랜치 규칙 문서와 ARM64 GitHub Actions 검증을 준비했다. 원격 보호 규칙은 실제 CI 결과 확인 후 설정한다.
+- Docker Desktop을 시작했다. Docker는 aarch64, 메모리 약 8GiB, 12 CPU다.
+- 준비를 재개했으나 KR ADM1(저해상도 Natural Earth 기반)과 ADM2(다른 출처) 경계 불일치로 228개 중 39개 ADM2가 부모 중첩률 80%를 통과하지 못했다. 임의 부모를 할당하지 않는다. 이 원인 해결 후 지리를 번들링한다.
+- npm audit에서 높은 심각도 6개를 확인했다. 프런트 실행 준비와 함께 기존 빌드 의존성을 점검한다. 전체 서비스 검증은 아직 시작하지 않았다.

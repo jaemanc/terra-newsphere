@@ -100,6 +100,8 @@ docs/                    데이터 계약, 지리, 운영, 재개 기록
 
 ## 설정 파일과 Git
 
+브랜치는 `feature/* → dev → prd`로 관리한다. 기본 개발 브랜치는 `dev`, 운영 후보 브랜치는 `prd`다. 기능별 PR과 필수 검사, 로컬 테스트 절차는 [브랜치 관리](docs/branching.md)를 따른다. 현재 운영 서버는 없으며 자동 운영 배포는 연결하지 않았다.
+
 `.env.example`에는 안전한 기본값과 설정 이름만 저장한다. `.dockerignore`, `.gitignore`, `.env.example`, Python/npm 잠금 파일, 소스·배포·문서는 커밋한다.
 
 실제 `.env`와 환경별 env 파일, 개인키·인증서 비밀 파일, AWS 자격 증명, Kubernetes Secret 파일은 제외한다. `node_modules`, `.venv`, 캐시, 빌드 결과, 로컬 실행 로그·체크포인트도 커밋하지 않는다. 준비를 마친 정적 지리와 출처·라이선스는 버전 관리 대상이다.
