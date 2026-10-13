@@ -82,3 +82,8 @@ Hobby의 2 vCPU / 8GB / 32GB는 빌드 자원이다. 프런트만 Vercel에 두�
 - 생성 결과: 국가 경계 174개, 한국 ADM1 17개/ADM2 189개, 미확정 ADM2 39개. GeoJSON 합계 510727바이트. 버전·출처·라이선스·SHA256과 서버용 매핑을 함께 버전 관리한다.
 - 한국 ADM2 원본 라이선스는 CC BY 3.0임을 확인하고 출처 문서를 수정했다. 전체 구·군 지원으로 표현하지 않는다.
 - 실제 Redis/API와 Kafka/Spark 연결 검증은 다음 dev 통합 단계에서 한 번에 진행한다.
+
+## 2026-10-13 로컬 실행 준비
+- `feature/local-runtime`에서 Vite를 수정 버전 6.4.4로 고정하고 `vite-plugin-static-copy`를 제거했다. Cesium 자산은 Node 표준 `fs`로 dev/build 전에 복사한다. 생성 자산은 Git·Docker 입력에서 제외한다.
+- 의존성 설치의 npm audit 결과는 취약점 0개다. dev 서버와 preview는 localhost에만 바인딩한다.
+- 준비 명령을 완료해 Python/npm과 버전 관리된 지리 번들을 사용할 수 있다. 테스트·ARM64 이미지 빌드·전체 파이프라인 검증은 dev 통합 뒤 진행한다.
