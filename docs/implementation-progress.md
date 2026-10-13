@@ -120,3 +120,13 @@ Hobby의 2 vCPU / 8GB / 32GB는 빌드 자원이다. 프런트만 Vercel에 두�
 - 로컬 Chrome 검증 통과: 대륙/국가 경계, 한국 확대, 초기 ADM0만 로드, ADM1/ADM2 lazy load와 부모 필터, 클릭 카드/안전한 원문 링크, UI 언어와 저장, 모바일 레이아웃. 프런트 수정 후 브라우저 오류·경고는 없었다. Docker의 localhost:8080에서도 기본 화면 검사를 통과했다.
 - Docker Desktop credential helper가 공개 이미지 metadata 조회에서 멈춘 것은 임시 익명 Docker 설정(.runtime 내부)으로 해결했다. 기존 Docker 자격 증명을 변경하지 않았다. 수정 프런트 linux/arm64 이미지 빌드와 컨테이너 교체를 완료했다.
 - 코드·이미지·지역 번들 검증은 완료했다. 현재 운영 서버가 없으므로 prd는 보호된 운영 후보 브랜치로 유지하며 실제 배포를 하지 않는다. GDELT 429와 39개 미확정 ADM2 제외는 현재 한계다. 이후 기능은 dev에서 새 feature 브랜치를 만들어 진행한다.
+
+## 2026-10-13 지도 확대·지역명 개선
+- `feature/map-detail-labels`에서 국가 경계를 Natural Earth 5.1.2 50m로 올렸다. ISO 국가 코드 236개, feature 238개, 국가 파일 1,677,683바이트다. 기존 geoBoundaries ADM1/ADM2 ID와 검증된 부모 관계를 유지한다.
+- 가까이 확대하면 저해상도 래스터를 숨기고 벡터 폴리곤·색상별 국가/ADM1/ADM2 경계를 표시한다. 확대 단계에 맞춰 내부 대표점에 국가·지역명을 표시하며, 라벨 좌표는 뉴스 위치와 분리한다.
+- 한국어 국가명·광역시/도·포함된 서울 구 이름을 제공한다. 뉴스 목록·hover·클릭 카드에는 검증된 위치 이름만 표시한다. 수도 fallback 뉴스는 보도 지역을 국가 수준으로 유지한다.
+- 소스가 공유하는 FIPS NT는 ISO 매핑이 모호해 제외하고 manifest에 기록한다. 한국의 미확정 ADM2 39개 제외는 유지한다.
+- 통합 검증의 Python 구문·Node 위치 표시 테스트·프런트 빌드·YAML/Compose/Kustomize·격리 Redis/API/지리 테스트 3개가 통과했다. Docker npm 네트워크 실패 후 불필요한 package.json 변경을 제거하고 기존 의존성 설치 레이어를 재사용해 4개 ARM64 이미지 빌드를 완료했다. 한국어 구 이름 추가 후 영향받은 Node 검사와 프런트 이미지만 다시 확인했다.
+- 6개 Docker 서비스 교체와 신규 데모 URL의 Kafka→Spark→Redis→API→프런트 proxy 전달을 통과했다. 실제 Chrome에서 ADM0 초기 로드·ADM1/ADM2 lazy load·부모 필터·보도 지역 표시·안전한 기사 링크·언어 저장·모바일·마커 hover/click을 확인했다. 마커 검사는 카메라 이동 뒤 뉴스 요청 완료를 기다리도록 수정했다.
+- 실제 확대 캡처에서 경계 가림과 라벨 밀도를 확인한 뒤 polyline을 폴리곤과 같은 geodesic으로 맞추고 표시 높이를 200m만 추가했다. 작은 ADM1 라벨은 면적에 맞는 확대 단계에서 나타난다. 영향받은 프런트 이미지·지도 화면 검사를 다시 확인했다.
+- 로컬은 Docker localhost:8080에서 실행 중이다. PR의 필수 ARM64 CI 통과 후 dev 병합 단계이며 prd 배포는 하지 않는다.

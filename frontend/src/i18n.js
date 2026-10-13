@@ -13,6 +13,8 @@ export const messages = {
     geographyError: 'Geographic boundaries could not be loaded.',
     expires: 'Available until', detected: 'Browser language', count: 'Current stories', days: '7-day window',
     reset: 'Reset globe', unknown: 'Publication time unavailable',
+    country: 'Country', adm1: 'Administrative region', adm2: 'District / subdivision', boundaries: 'Boundary legend',
+    reportedLocation: 'Reported location', vectorMap: 'Detailed boundary map', countryOnly: 'Only country boundaries are bundled here',
   },
   ko: {
     eyebrow: '지금, 세계의 이야기', tagline: '모든 이야기에는 장소가 있습니다.', subtitle: '지구를 돌려 최근 7일의 뉴스를 만나보세요.',
@@ -28,6 +30,8 @@ export const messages = {
     geographyError: '지리 경계 파일을 불러오지 못했습니다.',
     expires: '표시 만료', detected: '브라우저 언어', count: '현재 기사', days: '최근 7일',
     reset: '지구 초기화', unknown: '발행 시각 미제공',
+    country: '국가', adm1: '1차 행정구역', adm2: '2차 행정구역', boundaries: '경계 범례',
+    reportedLocation: '보도 지역', vectorMap: '상세 경계 지도', countryOnly: '이 국가는 국가 경계만 제공됩니다',
   },
 };
 

@@ -30,6 +30,7 @@ def main():
                 for path in (ROOT / folder).rglob("*.py"):
                     ast.parse(path.read_text(), filename=str(path))
             print("Python syntax: OK", flush=True)
+            subprocess.run(["node", "--test", "src/geo.test.js"], cwd=ROOT / "frontend", check=True)
             # These checks do not need Docker access; report them before service startup.
             subprocess.run(["npm", "run", "build"], cwd=ROOT / "frontend", check=True)
             import yaml
