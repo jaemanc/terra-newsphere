@@ -101,3 +101,22 @@ Hobby의 2 vCPU / 8GB / 32GB는 빌드 자원이다. 프런트만 Vercel에 두�
 - dev 검증: Python 구문, Vite 6.4.4 프런트 빌드(9.53초), YAML/Compose/Kustomize, 실제 격리 Redis의 뉴스 사이클·계층 검사 2개 모두 통과했다. 프런트 번들 크기/eval 경고는 남아 있다.
 - 컨테이너 의존성 설치는 로컬 네트워크 CA 미신뢰로 실패했다. `feature/container-runtime`에서 기존 시스템 trust store에 있는 CA와 일치하는 인증서만 선택하고, 선택적 BuildKit secret으로 설치하도록 수정했다. 기본 TLS 검증을 끄지 않는다. 인증서 파일은 .runtime에만 보관한다.
 - 컨테이너 빌드 재개 중이다. 이미 통과한 Python/프런트/Redis 전체 사이클은 반복하지 않고 수정한 이미지와 서비스 연결 단계만 이어간다.
+
+## 2026-10-13 실제 로컬 서비스 연결 통과·화면 수정 대기
+- 컨테이너 CA 수정 PR #3을 dev에 병합했다. API·수집기·Spark·프런트 4개 이미지의 linux/arm64 빌드가 완료됐다.
+- `docker compose --profile ingest up -d --wait` 성공. Redis/Kafka/API/프런트/수집기/Spark가 실행되고 Kafka 초기화 컨테이너는 exit 0이다. `http://localhost:8080/api/health`는 200이다.
+- 실행별 신규 데모 URL을 Kafka로 보냈으며 `scripts/check_pipeline.py`가 Kafka→Spark→Redis→FastAPI→프런트 proxy 전달 성공을 확인했다. 직접 Redis에 seed한 결과가 아니다.
+- 대기 상태 메모리 확인: Spark 약 456MiB, Kafka 약 410MiB, API 45MiB, 수집기 38MiB, Redis 11MiB, 프런트 10MiB. 본격 부하 테스트 수치는 아니다.
+- GDELT DOC 첫 호출은 HTTP 429였다. 우회하거나 재호출 폭주하지 않으며, 현재 화면 검증은 명시적으로 표시한 데모 기사로 진행한다.
+- 브랜치 workflow PR #4와 GitHub ARM64 CI가 실행 중이었다. Branch policy는 통과했고 Validate 최종 결과는 아직 확인하지 않았다. CI 완료 후 dev/prd의 필수 검사·PR·force push/삭제 금지 보호를 설정해야 한다.
+- 로컬 Chrome 초기 캡처는 만들었으나 대륙 일부가 빠져 보이는 문제를 사용자가 확인했다. 중국/러시아/한국/일본 등 원본 폴리곤은 존재하고 유효하며 모든 좌표는 2차원이다. 렌더링 원인 진단과 수정·화면 재검증이 남았다.
+- 세션 권한이 다시 제한 모드로 변경돼 Docker socket과 Git 인증 접근이 차단됐다. Docker/Chrome 권한 상승 요청은 실행 결과 없이 대기했다. 서비스가 종료됐다는 증거는 없다. 권한이 복구되면 새 feature/globe-rendering 브랜치에서 화면 문제부터 재개하고 PR #4/보호 설정을 마무리한다. 현재 진행 기록 변경은 아직 커밋하지 않았다.
+
+## 2026-10-13 권한 복구와 지구본 렌더링 수정
+- Full access 복구 후 컨테이너 6개가 계속 실행 중임을 확인했다.
+- GitHub ARM64 CI 실행 38349758487은 Branch policy/Validate 모두 성공했다. PR #4를 dev에 병합했고 dev/prd에 GitHub Actions의 두 필수 검사, 최신 base, PR 필요, 관리자 포함 보호, force push/삭제 금지를 적용했다.
+- `feature/globe-rendering`에서 화면 문제를 재현했다. 브라우저가 terrain-clamped polygon의 outline 미지원 경고를 남겼다. 현재 ellipsoid globe에는 경계의 일반 폴리곤 렌더링을 적용하고 실제 캡처로 비교 중이다.
+- 최종 화면 수정: 경계는 높이 0의 일반 폴리곤으로 표시하고, Cesium 1.131.0에 포함된 Natural Earth II 정적 저해상도 타일(level 0–2)을 사용한다. 국가 선택은 렌더러의 bounding sphere 계산이 PENDING에 머물던 Entity flyTo 대신 실제 경계 좌표의 Rectangle로 직접 이동한다. 새 지도 서비스나 지형 의존성은 추가하지 않았다.
+- 로컬 Chrome 검증 통과: 대륙/국가 경계, 한국 확대, 초기 ADM0만 로드, ADM1/ADM2 lazy load와 부모 필터, 클릭 카드/안전한 원문 링크, UI 언어와 저장, 모바일 레이아웃. 프런트 수정 후 브라우저 오류·경고는 없었다. Docker의 localhost:8080에서도 기본 화면 검사를 통과했다.
+- Docker Desktop credential helper가 공개 이미지 metadata 조회에서 멈춘 것은 임시 익명 Docker 설정(.runtime 내부)으로 해결했다. 기존 Docker 자격 증명을 변경하지 않았다. 수정 프런트 linux/arm64 이미지 빌드와 컨테이너 교체를 완료했다.
+- 코드·이미지·지역 번들 검증은 완료했다. 현재 운영 서버가 없으므로 prd는 보호된 운영 후보 브랜치로 유지하며 실제 배포를 하지 않는다. GDELT 429와 39개 미확정 ADM2 제외는 현재 한계다. 이후 기능은 dev에서 새 feature 브랜치를 만들어 진행한다.
