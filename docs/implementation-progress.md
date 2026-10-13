@@ -138,3 +138,5 @@ Hobby의 2 vCPU / 8GB / 32GB는 빌드 자원이다. 프런트만 Vercel에 두�
 - `VITE_CESIUM_ION_TOKEN`을 제공하면 Cesium AERIAL 배경을 사용하도록 연결했다. 토큰이 없는 현재 환경에서는 위성 서비스 성공을 주장하지 않으며 OSM을 검증한다.
 - 지역명 뒤 사각형을 제거하고 밝은 배경에 어두운 글씨/얇은 흰색 halo, 어두운 배경에 밝은 글씨/얇은 어두운 halo를 적용한다. 배경 위 폴리곤 tint도 낮춰 실제 지도 내용을 보존한다.
 - 프런트 이미지 빌드·Compose 설정 검사가 통과했다. 최초 연결 검사는 `ImageryLayerCollection.add()`가 반환값이 없는 것을 수정했다. 확대 검사는 실제 OSM 응답 200을 확인했지만 화면 중앙 줌에서 Cesium 1.131의 zero-axis 정규화 오류로 렌더링이 중단됐다. Unminified 엔진 스택이 `handleZoom → Camera.rotate → Quaternion.fromAxisAngle`인 것을 확인하고, 해당 카메라의 길이 0 회전만 no-op 처리했다. 수정 프런트 ARM64 이미지와 Docker 컨테이너 교체를 완료했다. Docker localhost:8080에서 실제 OSM level 13 타일 응답 200, 중앙 휠 확대, ADM2 계층, 출처 표시, 모바일, 외부 타일 중단 시 로컬 fallback이 통과했고 console/page/렌더 오류는 없었다. 같은 구성의 Unminified 개발 화면에서도 재현 검사가 통과했다. 뉴스/저장 구성은 바뀌지 않아 기존 파이프라인 검증을 반복하지 않는다. 필수 CI 통과 후 dev에 병합한다.
+
+- 마지막 화면 확인에서 비동기 경계 생성 완료 전에 렌더 요청이 끝나는 경우를 확인했다. 데이터 소스가 준비 중이거나 ready로 전환하는 프레임에만 렌더를 요청하고, 경계선은 ground-clamped polyline과 고정 색상으로 표시한다. 준비 후 idle 렌더 모드는 유지한다. 영향받은 프런트 이미지와 확대/모바일/fallback 검사는 다시 통과했다.

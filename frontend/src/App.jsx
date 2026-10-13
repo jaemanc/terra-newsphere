@@ -63,6 +63,7 @@ export default function App() {
     let handler;
     let timer;
     let removeMove;
+    let removeReadyRender;
     let removeImageryError;
     let detail;
     let detailFailed = false;
@@ -75,6 +76,12 @@ export default function App() {
         skyBox: false, requestRenderMode: true, maximumRenderTimeChange: Infinity,
       });
       viewer.current = globe;
+      let geometryReady = false;
+      removeReadyRender = globe.scene.postUpdate.addEventListener(() => {
+        const ready = globe.dataSourceDisplay.ready;
+        if (!ready || ready !== geometryReady) globe.scene.requestRender();
+        geometryReady = ready;
+      });
       // Cesium 1.131 center zoom can rotate identical picked normals around a zero axis.
       // That rotation has no effect; skip it before the engine normalizes the axis.
       const rotate = globe.camera.rotate.bind(globe.camera);
@@ -194,6 +201,7 @@ export default function App() {
     }
     return () => {
       alive = false; clearTimeout(timer); removeMove?.(); handler?.destroy();
+      removeReadyRender?.();
       removeImageryError?.();
       if (globe && !globe.isDestroyed()) globe.destroy();
       viewer.current = null;

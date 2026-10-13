@@ -20,7 +20,6 @@ export function decorateLayer(layer, level, globe, locale, selection) {
     const lightStroke = Cesium.Color.fromCssColorString(level === 'country' ? '#83b7af' : level === 'adm1' ? '#b9dcc7' : '#e8c687');
     const darkStroke = Cesium.Color.fromCssColorString(level === 'country' ? '#3a6b71' : level === 'adm1' ? '#197769' : '#ac641b');
     const lightMap = () => hasDetailImagery(globe) && !satellite;
-    const stroke = () => lightMap() ? darkStroke : lightStroke;
     const height = MAP_HEIGHT + (level === 'adm1' ? 40 : level === 'adm2' ? 80 : 0);
     entity.polygon.height = height;
     entity.polygon.outline = false;
@@ -33,11 +32,12 @@ export function decorateLayer(layer, level, globe, locale, selection) {
     }, false));
     const hierarchy = entity.polygon.hierarchy.getValue();
     entity.polyline = new Cesium.PolylineGraphics({
+      clampToGround: true,
       positions: hierarchy.positions.map(position => {
         const point = Cesium.Cartographic.fromCartesian(position);
         return Cesium.Cartesian3.fromRadians(point.longitude, point.latitude, height + 200);
       }),
-      material: new Cesium.ColorMaterialProperty(new Cesium.CallbackProperty(stroke, false)),
+      material: satellite ? lightStroke : darkStroke,
       width: level === 'adm2' ? 2 : 1.5, arcType: Cesium.ArcType.GEODESIC,
     });
     if (labelled.has(key) || !Number.isFinite(props.label_longitude) || !Number.isFinite(props.label_latitude)) continue;
