@@ -1,5 +1,6 @@
 import * as Cesium from 'cesium';
 import { countryName, regionName } from './geo.js';
+import { hasDetailImagery, satellite } from './imagery.js';
 
 // Presentation offsets keep vector faces, borders and points clear of the ellipsoid.
 export const MAP_HEIGHT = 1000;
@@ -16,22 +17,28 @@ export function decorateLayer(layer, level, globe, locale, selection) {
     const base = Cesium.Color.fromCssColorString(LAND[index]);
     const light = base.withAlpha(level === 'country' ? 0.08 : 0.12);
     const active = Cesium.Color.fromCssColorString('#467e67').withAlpha(0.55);
-    const stroke = Cesium.Color.fromCssColorString(level === 'country' ? '#83b7af' : level === 'adm1' ? '#b9dcc7' : '#e8c687');
+    const lightStroke = Cesium.Color.fromCssColorString(level === 'country' ? '#83b7af' : level === 'adm1' ? '#b9dcc7' : '#e8c687');
+    const darkStroke = Cesium.Color.fromCssColorString(level === 'country' ? '#3a6b71' : level === 'adm1' ? '#197769' : '#ac641b');
+    const lightMap = () => hasDetailImagery(globe) && !satellite;
     const height = MAP_HEIGHT + (level === 'adm1' ? 40 : level === 'adm2' ? 80 : 0);
     entity.polygon.height = height;
     entity.polygon.outline = false;
     if (level === 'country') entity.polygon.fill = globe.camera.positionCartographic.height < 3000000;
     entity.polygon.material = new Cesium.ColorMaterialProperty(new Cesium.CallbackProperty(() => {
+      if (hasDetailImagery(globe)) return selection.current[level] === props.region_id
+        ? active.withAlpha(0.12) : base.withAlpha(0.015);
       if (level === 'country') return globe.camera.positionCartographic.height < 3000000 ? base : light;
       return selection.current[level] === props.region_id ? active : light;
     }, false));
     const hierarchy = entity.polygon.hierarchy.getValue();
     entity.polyline = new Cesium.PolylineGraphics({
+      clampToGround: true,
       positions: hierarchy.positions.map(position => {
         const point = Cesium.Cartographic.fromCartesian(position);
         return Cesium.Cartesian3.fromRadians(point.longitude, point.latitude, height + 200);
       }),
-      material: stroke, width: level === 'adm2' ? 2 : 1.5, arcType: Cesium.ArcType.GEODESIC,
+      material: satellite ? lightStroke : darkStroke,
+      width: level === 'adm2' ? 2 : 1.5, arcType: Cesium.ArcType.GEODESIC,
     });
     if (labelled.has(key) || !Number.isFinite(props.label_longitude) || !Number.isFinite(props.label_latitude)) continue;
     labelled.add(key);
@@ -49,10 +56,11 @@ export function decorateLayer(layer, level, globe, locale, selection) {
         return cameraHeight < 150000 && (!selection.current.adm1 || props.adm1_id === selection.current.adm1);
       }, false),
       font: level === 'country' ? '600 15px sans-serif' : '600 13px sans-serif',
-      fillColor: stroke, outlineColor: Cesium.Color.fromCssColorString('#071018'), outlineWidth: 3,
+      fillColor: new Cesium.CallbackProperty(() => lightMap() ? Cesium.Color.fromCssColorString('#183b42') : lightStroke, false),
+      outlineColor: new Cesium.CallbackProperty(() => lightMap() ? Cesium.Color.WHITE : Cesium.Color.fromCssColorString('#071018'), false),
+      outlineWidth: 2,
       style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-      showBackground: true, backgroundColor: Cesium.Color.fromCssColorString('#071018').withAlpha(0.65),
-      backgroundPadding: new Cesium.Cartesian2(4, 3),
+      showBackground: false,
       scaleByDistance: new Cesium.NearFarScalar(100000, 1, 30000000, 0.7),
     });
   }

@@ -5,6 +5,8 @@ RUN --mount=type=secret,id=terra_ca,target=/tmp/terra_ca.crt \
     if [ -s /tmp/terra_ca.crt ]; then export NODE_EXTRA_CA_CERTS=/tmp/terra_ca.crt; fi \
     && npm ci
 COPY frontend ./
+ARG VITE_CESIUM_ION_TOKEN=""
+ARG VITE_OSM_TILE_URL="https://tile.openstreetmap.org/"
 RUN npm run build
 
 FROM nginx:1.28.0-alpine

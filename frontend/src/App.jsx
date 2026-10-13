@@ -3,6 +3,7 @@ import * as Cesium from 'cesium';
 import { initialLocale, messages } from './i18n.js';
 import { countryName, regionName, locationName, locationsName } from './geo.js';
 import { decorateLayer, MARKER_HEIGHT } from './map-layers.js';
+import { overviewLayer, detailLayer, satellite } from './imagery.js';
 
 const FALLBACK = '/images/fallback.svg';
 
@@ -28,6 +29,7 @@ export default function App() {
   const [selected, setSelected] = useState(null);
   const [preview, setPreview] = useState(null);
   const [globeError, setGlobeError] = useState(false);
+  const [imageryUnavailable, setImageryUnavailable] = useState(false);
   const [ready, setReady] = useState(false);
   const host = useRef(null);
   const viewer = useRef(null);
@@ -61,17 +63,47 @@ export default function App() {
     let handler;
     let timer;
     let removeMove;
+    let removeReadyRender;
+    let removeImageryError;
+    let detail;
+    let detailFailed = false;
     try {
       globe = new Cesium.Viewer(host.current, {
-        // Cesium bundles this low-resolution Natural Earth map; no external tiles or terrain.
-        baseLayer: Cesium.ImageryLayer.fromProviderAsync(Cesium.TileMapServiceImageryProvider.fromUrl(
-          '/cesium/Assets/Textures/NaturalEarthII', { maximumLevel: 2, credit: 'Natural Earth II' })),
+        baseLayer: overviewLayer(),
         baseLayerPicker: false, geocoder: false, homeButton: false,
         sceneModePicker: false, navigationHelpButton: false, animation: false, timeline: false,
         fullscreenButton: false, infoBox: false, selectionIndicator: false,
         skyBox: false, requestRenderMode: true, maximumRenderTimeChange: Infinity,
       });
       viewer.current = globe;
+      let geometryReady = false;
+      removeReadyRender = globe.scene.postUpdate.addEventListener(() => {
+        const ready = globe.dataSourceDisplay.ready;
+        if (!ready || ready !== geometryReady) globe.scene.requestRender();
+        geometryReady = ready;
+      });
+      // Cesium 1.131 center zoom can rotate identical picked normals around a zero axis.
+      // That rotation has no effect; skip it before the engine normalizes the axis.
+      const rotate = globe.camera.rotate.bind(globe.camera);
+      globe.camera.rotate = (axis, angle) => {
+        if (Cesium.Cartesian3.magnitudeSquared(axis) !== 0) rotate(axis, angle);
+      };
+      // Fetch external imagery only for the visible close view, keeping local geography separate.
+      globe.scene.globe.preloadAncestors = false;
+      globe.scene.globe.preloadSiblings = false;
+      detail = detailLayer();
+      globe.imageryLayers.add(detail);
+      const unavailable = () => {
+        if (!alive || detailFailed) return;
+        detailFailed = true; detail.show = false;
+        setImageryUnavailable(true); updateView();
+      };
+      detail.errorEvent.addEventListener(unavailable);
+      const watchProvider = provider => {
+        if (alive) removeImageryError = provider.errorEvent.addEventListener(unavailable);
+      };
+      if (detail.ready) watchProvider(detail.imageryProvider);
+      else detail.readyEvent.addEventListener(watchProvider);
       globe.scene.globe.baseColor = Cesium.Color.fromCssColorString('#103441');
       globe.scene.backgroundColor = Cesium.Color.fromCssColorString('#071018');
       globe.scene.globe.showGroundAtmosphere = true;
@@ -146,7 +178,7 @@ export default function App() {
             .map(Cesium.Math.toDegrees).map((value) => value.toFixed(4)).join(',') : null;
           if (globe.imageryLayers.length) {
             const detailed = globe.camera.positionCartographic.height < 3000000;
-            globe.imageryLayers.get(0).show = !detailed;
+            detail.show = detailed && !detailFailed;
             for (const entity of countryLayer.current?.entities.values || []) entity.polygon.fill = detailed;
             globe.scene.requestRender();
           }
@@ -169,6 +201,8 @@ export default function App() {
     }
     return () => {
       alive = false; clearTimeout(timer); removeMove?.(); handler?.destroy();
+      removeReadyRender?.();
+      removeImageryError?.();
       if (globe && !globe.isDestroyed()) globe.destroy();
       viewer.current = null;
     };
@@ -411,7 +445,7 @@ export default function App() {
               <a href={preview.source.url} target="_blank" rel="noopener noreferrer">{text.source} ↗</a></>}
           </div>
         </article>}
-        {view?.height < 3000000 && <div className="map-mode">{text.vectorMap}
+        {view?.height < 3000000 && <div className="map-mode">{imageryUnavailable ? text.imageryFallback : satellite ? text.satelliteMap : text.detailMap}
           {country && !manifest.current?.administrative[country] && <span>{text.countryOnly}</span>}
         </div>}
         <div className="globe-bottom"><span>{text.instruction}</span><span className="view-count">{shownItems.length} {text.stories}</span></div>

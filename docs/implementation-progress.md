@@ -130,3 +130,13 @@ Hobby의 2 vCPU / 8GB / 32GB는 빌드 자원이다. 프런트만 Vercel에 두�
 - 6개 Docker 서비스 교체와 신규 데모 URL의 Kafka→Spark→Redis→API→프런트 proxy 전달을 통과했다. 실제 Chrome에서 ADM0 초기 로드·ADM1/ADM2 lazy load·부모 필터·보도 지역 표시·안전한 기사 링크·언어 저장·모바일·마커 hover/click을 확인했다. 마커 검사는 카메라 이동 뒤 뉴스 요청 완료를 기다리도록 수정했다.
 - 실제 확대 캡처에서 경계 가림과 라벨 밀도를 확인한 뒤 polyline을 폴리곤과 같은 geodesic으로 맞추고 표시 높이를 200m만 추가했다. 작은 ADM1 라벨은 면적에 맞는 확대 단계에서 나타난다. 모바일에서는 화면 너비에 맞춰 국가·ADM1 라벨 밀도를 줄인다. 영향받은 프런트 이미지·지도 화면 검사를 다시 확인했다.
 - 로컬은 Docker localhost:8080에서 실행 중이다. PR의 필수 ARM64 CI 통과 후 dev 병합 단계이며 prd 배포는 하지 않는다.
+
+## 2026-10-13 온라인 상세 배경·라벨 스타일
+- 지도/지역명 PR #6은 최종 ARM64 CI 38358233686의 Branch policy/Validate를 통과하고 dev에 merge commit `5336029`로 병합했다.
+- 사용자가 지도 교체 대화와 함께 온라인 상세 배경 허용 및 라벨 배경 박스 제거를 요청했다. `feature/map-imagery-style`에서 Cesium/OSM 공식 문서와 타일 사용 정책을 확인했다.
+- 토큰 없이 바로 사용 가능한 OSM을 확대 배경으로 적용한다. 전 지구 화면은 기존 로컬 타일이며, 화면 밖 선행 다운로드를 끄고 level 13까지 필요한 타일만 브라우저에서 받는다. 한국 경계 파일과 뉴스 좌표는 그대로 유지한다.
+- `VITE_CESIUM_ION_TOKEN`을 제공하면 Cesium AERIAL 배경을 사용하도록 연결했다. 토큰이 없는 현재 환경에서는 위성 서비스 성공을 주장하지 않으며 OSM을 검증한다.
+- 지역명 뒤 사각형을 제거하고 밝은 배경에 어두운 글씨/얇은 흰색 halo, 어두운 배경에 밝은 글씨/얇은 어두운 halo를 적용한다. 배경 위 폴리곤 tint도 낮춰 실제 지도 내용을 보존한다.
+- 프런트 이미지 빌드·Compose 설정 검사가 통과했다. 최초 연결 검사는 `ImageryLayerCollection.add()`가 반환값이 없는 것을 수정했다. 확대 검사는 실제 OSM 응답 200을 확인했지만 화면 중앙 줌에서 Cesium 1.131의 zero-axis 정규화 오류로 렌더링이 중단됐다. Unminified 엔진 스택이 `handleZoom → Camera.rotate → Quaternion.fromAxisAngle`인 것을 확인하고, 해당 카메라의 길이 0 회전만 no-op 처리했다. 수정 프런트 ARM64 이미지와 Docker 컨테이너 교체를 완료했다. Docker localhost:8080에서 실제 OSM level 13 타일 응답 200, 중앙 휠 확대, ADM2 계층, 출처 표시, 모바일, 외부 타일 중단 시 로컬 fallback이 통과했고 console/page/렌더 오류는 없었다. 같은 구성의 Unminified 개발 화면에서도 재현 검사가 통과했다. 뉴스/저장 구성은 바뀌지 않아 기존 파이프라인 검증을 반복하지 않는다. 필수 CI 통과 후 dev에 병합한다.
+
+- 마지막 화면 확인에서 비동기 경계 생성 완료 전에 렌더 요청이 끝나는 경우를 확인했다. 데이터 소스가 준비 중이거나 ready로 전환하는 프레임에만 렌더를 요청하고, 경계선은 ground-clamped polyline과 고정 색상으로 표시한다. 준비 후 idle 렌더 모드는 유지한다. 영향받은 프런트 이미지와 확대/모바일/fallback 검사는 다시 통과했다.
