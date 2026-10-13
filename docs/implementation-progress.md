@@ -87,3 +87,9 @@ Hobby의 2 vCPU / 8GB / 32GB는 빌드 자원이다. 프런트만 Vercel에 두�
 - `feature/local-runtime`에서 Vite를 수정 버전 6.4.4로 고정하고 `vite-plugin-static-copy`를 제거했다. Cesium 자산은 Node 표준 `fs`로 dev/build 전에 복사한다. 생성 자산은 Git·Docker 입력에서 제외한다.
 - 의존성 설치의 npm audit 결과는 취약점 0개다. dev 서버와 preview는 localhost에만 바인딩한다.
 - 준비 명령을 완료해 Python/npm과 버전 관리된 지리 번들을 사용할 수 있다. 테스트·ARM64 이미지 빌드·전체 파이프라인 검증은 dev 통합 뒤 진행한다.
+
+## 2026-10-13 dev 통합 검증과 컨테이너 수정
+- 지리 PR #1과 로컬 실행 준비 PR #2를 dev로 merge commit 병합했다.
+- dev 검증: Python 구문, Vite 6.4.4 프런트 빌드(9.53초), YAML/Compose/Kustomize, 실제 격리 Redis의 뉴스 사이클·계층 검사 2개 모두 통과했다. 프런트 번들 크기/eval 경고는 남아 있다.
+- 컨테이너 의존성 설치는 로컬 네트워크 CA 미신뢰로 실패했다. `feature/container-runtime`에서 기존 시스템 trust store에 있는 CA와 일치하는 인증서만 선택하고, 선택적 BuildKit secret으로 설치하도록 수정했다. 기본 TLS 검증을 끄지 않는다. 인증서 파일은 .runtime에만 보관한다.
+- 컨테이너 빌드 재개 중이다. 이미 통과한 Python/프런트/Redis 전체 사이클은 반복하지 않고 수정한 이미지와 서비스 연결 단계만 이어간다.

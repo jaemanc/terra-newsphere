@@ -1,0 +1,17 @@
+# Optional build-time CA from the operator's existing trust store.
+services:
+  api:
+    build:
+      secrets: [terra_ca]
+  collector:
+    build:
+      secrets: [terra_ca]
+  spark:
+    build:
+      secrets: [terra_ca]
+  frontend:
+    build:
+      secrets: [terra_ca]
+secrets:
+  terra_ca:
+    file: ${TERRA_CA_CERT:?Set TERRA_CA_CERT to an existing trusted CA certificate}
