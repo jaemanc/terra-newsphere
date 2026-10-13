@@ -27,6 +27,15 @@ def write(path, value):
     path.write_text(json.dumps(value, ensure_ascii=False, separators=(",", ":")) + "\n")
 
 
+def adm1_parent(geometry, parents):
+    matches = [(parent, polygon.intersection(geometry).area) for parent, polygon in parents
+               if polygon.intersects(geometry)]
+    if not matches or geometry.area <= 0:
+        return None
+    parent, overlap = max(matches, key=lambda match: match[1])
+    return parent if overlap / geometry.area >= 0.8 else None
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--refresh-sources", action="store_true", help="Resolve current geoBoundaries once and lock immutable URLs")
@@ -79,7 +88,7 @@ def main():
             features.append({"type": "Feature", "properties": {"country_code": code, "name": name},
                              "geometry": mapping(geometry)})
         write(PUBLIC / "countries.geojson", {"type": "FeatureCollection", "features": features})
-        regions, parent_shapes, assets = {}, [], {}
+        regions, parent_shapes, assets, unresolved = {}, [], {}, []
         for source in sources["geoboundaries"]:
             raw = download(client, source["url"])
             output = []
@@ -98,13 +107,12 @@ def main():
                                   district_name=None, location_type="adm1")
                     parent_shapes.append((region_id, geometry))
                 else:
-                    matches = [(parent, polygon.intersection(geometry).area) for parent, polygon in parent_shapes
-                               if polygon.intersects(geometry)]
-                    if not matches:
-                        raise ValueError(f"No ADM1 parent for {region_id}")
-                    parent, overlap = max(matches, key=lambda match: match[1])
-                    if overlap / geometry.area < 0.8:
-                        raise ValueError(f"Ambiguous ADM1 parent for {region_id}")
+                    parent = adm1_parent(geometry, parent_shapes)
+                    if parent is None:
+                        # Incompatible upstream boundaries cannot establish a reliable hierarchy.
+                        unresolved.append({"region_id": region_id, "name": props["shapeName"],
+                                           "reason": "ADM1 overlap below 80%"})
+                        continue
                     region.update(adm1_id=parent, adm2_id=region_id,
                                   region_name=regions[parent]["region_name"], district_name=props["shapeName"],
                                   location_type="adm2")
@@ -121,8 +129,10 @@ def main():
         files = {str(path.relative_to(PUBLIC)): {"sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
                  "bytes": path.stat().st_size} for path in PUBLIC.rglob("*.geojson")}
         write(PUBLIC / "manifest.json", {"countries": "countries.geojson", "administrative": assets,
-               "sources": sources, "files": files, "format": "GeoJSON", "simplification_degrees": {"adm0": 0.05, "adm1_adm2": 0.01}})
-        print(f"Bundled {len(countries)} countries, {len(regions)} administrative regions")
+               "sources": sources, "files": files, "format": "GeoJSON", "unresolved_regions": unresolved,
+               "simplification_degrees": {"adm0": 0.05, "adm1_adm2": 0.01}})
+        print(f"Bundled {len(countries)} countries, {len(regions)} administrative regions; "
+              f"omitted {len(unresolved)} ambiguous ADM2 boundaries")
 
 
 if __name__ == "__main__":
