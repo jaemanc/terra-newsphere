@@ -89,7 +89,9 @@ sh scripts/complete-local.sh
 TERRA_SKIP_TLS_VERIFY=1 sh scripts/complete-local.sh
 ```
 
-현재 검증 결과는 Python 구문·프런트 빌드·Compose 설정·K3s 렌더링 통과다. Redis/Kafka/Spark 실제 연결과 WebGL 상호작용은 아직 미검증이다. 자세한 상태는 [구현 진행 기록](docs/implementation-progress.md)을 따른다.
+Python 구문·프런트 빌드·Compose/K3s 설정, 실제 Redis의 중복·7일 만료·지역 조회·API, ARM64 Kafka→Spark→Redis→HTTP 연결 검증을 통과했다. 로컬 Chrome에서 지구 렌더링, 한국 확대, ADM1/ADM2 단계별 로딩, 뉴스 카드·원문 링크, 언어 저장, 모바일 화면도 확인했다. 자세한 결과와 지리 지원 범위는 [구현 진행 기록](docs/implementation-progress.md)을 따른다.
+
+현재 GDELT DOC가 HTTP 429를 반환해 화면에는 명시적으로 표시한 데모 기사를 사용한다. 수집기는 설정된 간격으로 재시도하며 공급자의 제한을 우회하지 않는다.
 
 ## 디렉토리
 

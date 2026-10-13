@@ -53,7 +53,10 @@ export default function App() {
     let removeMove;
     try {
       globe = new Cesium.Viewer(host.current, {
-        baseLayer: false, baseLayerPicker: false, geocoder: false, homeButton: false,
+        // Cesium bundles this low-resolution Natural Earth map; no external tiles or terrain.
+        baseLayer: Cesium.ImageryLayer.fromProviderAsync(Cesium.TileMapServiceImageryProvider.fromUrl(
+          '/cesium/Assets/Textures/NaturalEarthII', { maximumLevel: 2, credit: 'Natural Earth II' })),
+        baseLayerPicker: false, geocoder: false, homeButton: false,
         sceneModePicker: false, navigationHelpButton: false, animation: false, timeline: false,
         fullscreenButton: false, infoBox: false, selectionIndicator: false,
         skyBox: false, requestRenderMode: true, maximumRenderTimeChange: Infinity,
@@ -94,11 +97,11 @@ export default function App() {
         setCountries(boundaries.features.map((feature) => feature.properties).sort((a, b) => a.name.localeCompare(b.name)));
         const layer = await Cesium.GeoJsonDataSource.load(boundaries, {
           stroke: Cesium.Color.fromCssColorString('#51948f').withAlpha(0.65), strokeWidth: 1,
-          fill: Cesium.Color.fromCssColorString('#285b53').withAlpha(0.55), clampToGround: true,
+          fill: Cesium.Color.fromCssColorString('#285b53').withAlpha(0.08), clampToGround: false,
         });
         if (!alive) return;
         countryLayer.current = layer;
-        globe.dataSources.add(layer);
+        await globe.dataSources.add(layer);
         globe.scene.requestRender();
       }).catch(() => { if (alive) setGlobeError('geography'); });
       handler = new Cesium.ScreenSpaceEventHandler(globe.scene.canvas);
@@ -172,7 +175,7 @@ export default function App() {
           next[current] = data.features.map((feature) => feature.properties);
           layer = await Cesium.GeoJsonDataSource.load(data, {
             stroke: Cesium.Color.fromCssColorString(current === 'adm1' ? '#8cbaa8' : '#bac9ac').withAlpha(0.75),
-            strokeWidth: 1, fill: Cesium.Color.fromCssColorString('#366859').withAlpha(0.08), clampToGround: true,
+            strokeWidth: 1, fill: Cesium.Color.fromCssColorString('#366859').withAlpha(0.08), clampToGround: false,
           });
           if (!alive || !viewer.current) return;
           // Keep only the selected country's detail; never accumulate global ADM2 geometry.
@@ -305,8 +308,13 @@ export default function App() {
   function chooseCountry(code) {
     setCountry(code); setAdm1(''); setAdm2(''); setSelected(null);
     if (code && countryLayer.current) {
-      const entity = countryLayer.current.entities.values.find((item) => item.properties?.country_code?.getValue() === code);
-      if (entity) viewer.current.flyTo(entity, { duration: 1.2 });
+      const positions = countryLayer.current.entities.values
+        .filter((item) => item.properties?.country_code?.getValue() === code)
+        .flatMap((item) => item.polygon?.hierarchy.getValue().positions || []);
+      if (positions.length) {
+        viewer.current.camera.flyTo({ destination: Cesium.Rectangle.fromCartesianArray(positions), duration: 1.2 });
+        viewer.current.scene.requestRender();
+      }
     }
   }
 
