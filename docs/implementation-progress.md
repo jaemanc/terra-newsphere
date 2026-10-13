@@ -84,3 +84,20 @@ Hobby의 2 vCPU / 8GB / 32GB는 빌드 자원이다. 프런트만 Vercel에 두�
 - Docker Desktop을 시작했다. Docker는 aarch64, 메모리 약 8GiB, 12 CPU다.
 - 준비를 재개했으나 KR ADM1(저해상도 Natural Earth 기반)과 ADM2(다른 출처) 경계 불일치로 228개 중 39개 ADM2가 부모 중첩률 80%를 통과하지 못했다. 임의 부모를 할당하지 않는다. 이 원인 해결 후 지리를 번들링한다.
 - npm audit에서 높은 심각도 6개를 확인했다. 프런트 실행 준비와 함께 기존 빌드 의존성을 점검한다. 전체 서비스 검증은 아직 시작하지 않았다.
+
+## 2026-10-13 정적 지리 번들 완료
+- `feature/static-geography`에서 실제 원본의 ADM1/ADM2 불일치를 확인했다. 부모 중첩률이 80% 미만인 ADM2는 임의 할당하지 않고 제외 목록을 manifest에 기록한다. 정상 경계 전체 생성을 중단하던 동작을 수정했다.
+- 생성 결과: 국가 경계 174개, 한국 ADM1 17개/ADM2 189개, 미확정 ADM2 39개. GeoJSON 합계 510727바이트. 버전·출처·라이선스·SHA256과 서버용 매핑을 함께 버전 관리한다.
+- 한국 ADM2 원본 라이선스는 CC BY 3.0임을 확인하고 출처 문서를 수정했다. 전체 구·군 지원으로 표현하지 않는다.
+- 실제 Redis/API와 Kafka/Spark 연결 검증은 다음 dev 통합 단계에서 한 번에 진행한다.
+
+## 2026-10-13 로컬 실행 준비
+- `feature/local-runtime`에서 Vite를 수정 버전 6.4.4로 고정하고 `vite-plugin-static-copy`를 제거했다. Cesium 자산은 Node 표준 `fs`로 dev/build 전에 복사한다. 생성 자산은 Git·Docker 입력에서 제외한다.
+- 의존성 설치의 npm audit 결과는 취약점 0개다. dev 서버와 preview는 localhost에만 바인딩한다.
+- 준비 명령을 완료해 Python/npm과 버전 관리된 지리 번들을 사용할 수 있다. 테스트·ARM64 이미지 빌드·전체 파이프라인 검증은 dev 통합 뒤 진행한다.
+
+## 2026-10-13 dev 통합 검증과 컨테이너 수정
+- 지리 PR #1과 로컬 실행 준비 PR #2를 dev로 merge commit 병합했다.
+- dev 검증: Python 구문, Vite 6.4.4 프런트 빌드(9.53초), YAML/Compose/Kustomize, 실제 격리 Redis의 뉴스 사이클·계층 검사 2개 모두 통과했다. 프런트 번들 크기/eval 경고는 남아 있다.
+- 컨테이너 의존성 설치는 로컬 네트워크 CA 미신뢰로 실패했다. `feature/container-runtime`에서 기존 시스템 trust store에 있는 CA와 일치하는 인증서만 선택하고, 선택적 BuildKit secret으로 설치하도록 수정했다. 기본 TLS 검증을 끄지 않는다. 인증서 파일은 .runtime에만 보관한다.
+- 컨테이너 빌드 재개 중이다. 이미 통과한 Python/프런트/Redis 전체 사이클은 반복하지 않고 수정한 이미지와 서비스 연결 단계만 이어간다.

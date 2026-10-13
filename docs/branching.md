@@ -23,4 +23,3 @@ GitHub에서 `feature/my-feature → dev` PR을 만들고 `Branch policy`와 `Va
 CI는 ARM64 runner에서 고정 의존성, 프런트 빌드, 배포 설정, 격리 Redis/API/7일 만료와 실제 Kafka→Spark→Redis→HTTP 경로를 검증한다. 정적 지리 번들은 같은 커밋에 포함하므로 CI나 런타임에 지리 원본을 다시 다운로드하지 않는다.
 
 `dev`에서 실행할 때는 README의 준비·검증·실행 명령을 따른다. 테스트 뒤 로컬 Compose 서비스를 유지하므로 `http://localhost:8080`에서 확인할 수 있다. `prd` 병합은 운영 후보를 확정하는 것이며 현재 서버 배포를 실행하지 않는다. OCI/K3s 서버는 아직 없고 자동 배포 자격 증명도 설정하지 않았다. 서버 준비 후 [운영 문서](operations.md)의 ARM64 이미지·K3s 절차를 연결한다.
-

@@ -13,6 +13,7 @@ __pycache__/
 *.egg-info/
 node_modules/
 dist/
+frontend/public/cesium/
 .idea/
 .DS_Store
 .runtime/

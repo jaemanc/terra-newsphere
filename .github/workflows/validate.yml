@@ -51,8 +51,7 @@ jobs:
           version: 0.12.9
       - name: Install locked dependencies
         run: |
-          uv sync --frozen --python 3.12 --extra api --extra collector --extra dev
+          uv sync --frozen --python 3.12 --extra api --extra collector --extra geo --extra dev
           npm --prefix frontend ci
       - name: Validate API, retention, globe build and ARM64 pipeline
         run: .venv/bin/python scripts/verify.py --containers
-

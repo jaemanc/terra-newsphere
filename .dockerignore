@@ -13,6 +13,7 @@
 .runtime
 **/node_modules
 **/dist
+frontend/public/cesium
 **/__pycache__
 geo/raw
 spark/checkpoints
