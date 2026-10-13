@@ -41,9 +41,11 @@ export function decorateLayer(layer, level, globe, locale, selection) {
         ? countryName(props.country_code, locale.current, props.name) : regionName(props.name, locale.current), false),
       show: new Cesium.CallbackProperty(() => {
         const cameraHeight = globe.camera.positionCartographic.height;
-        if (level === 'country') return cameraHeight > 700000 && cameraHeight < Math.sqrt(props.label_area) * 2000000 + 2000000;
+        const density = Math.min(1, globe.canvas.clientWidth / 1000);
+        if (level === 'country') return cameraHeight > 700000
+          && cameraHeight < Math.sqrt(props.label_area) * 2000000 * density + 2000000;
         if (level === 'adm1') return cameraHeight > 100000
-          && cameraHeight < Math.min(3000000, Math.sqrt(props.label_area) * 1000000 + 150000);
+          && cameraHeight < Math.min(3000000, Math.sqrt(props.label_area) * 1000000 * density + 150000);
         return cameraHeight < 150000 && (!selection.current.adm1 || props.adm1_id === selection.current.adm1);
       }, false),
       font: level === 'country' ? '600 15px sans-serif' : '600 13px sans-serif',
