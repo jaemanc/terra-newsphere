@@ -6,4 +6,6 @@
 
 Geometry is simplified for globe rendering. Administrative IDs use `boundaryID:shapeID`, not national official codes. ADM2 parents are derived from at least 80% polygon overlap with the selected ADM1 dataset; ambiguous relationships are omitted from the bundle and documented in the manifest. Coordinates are original unsimplified polygon centroids or Natural Earth capital points, used as presentation fallbacks.
 
-Country boundaries use 0.01-degree simplification. Label anchors are polygon interior representative points, separate from news coordinates. Runtime overview uses the bundled raster; close views use vector polygons and borders.
+Country boundaries use 0.01-degree simplification. Label anchors are polygon interior representative points, separate from news coordinates. Runtime overview uses the bundled raster; close views use streamed imagery with local vector polygons and borders.
+
+- OpenStreetMap standard tiles: © OpenStreetMap contributors, [copyright / ODbL](https://www.openstreetmap.org/copyright), [tile usage policy](https://operations.osmfoundation.org/policies/tiles/). Close views request visible tiles directly in the browser; no tiles are bundled in this repository. Optional Cesium ion imagery uses the account token and provider credits supplied by Cesium.

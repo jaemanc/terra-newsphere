@@ -10,7 +10,17 @@
 
 현재 고정한 한국 ADM1과 ADM2는 원래 출처와 해상도가 다르다. ADM1과 80% 이상 중첩되지 않는 ADM2는 부모를 추측하지 않고 화면·서버 매핑에서 제외한다. 제외한 원본 ID·이름·이유는 manifest의 `unresolved_regions`에 기록한다. 따라서 한국 전체 구·군을 지원한다고 표시하지 않는다. 부모 관계는 해당 버전 경계의 공간 중첩이며 공식 행정 코드와 동일하다고 가정하지 않는다.
 
-초기 경계 로드는 ADM0뿐이다. 선택 국가를 확대하면 ADM1, 더 확대하면 ADM2를 로드한다. 상세 데이터는 한 국가만 유지하며 파일이 없는 국가는 정상적으로 ADM0에 머문다. 전 지구 화면은 기본 타원체와 고정 Cesium 패키지에 포함된 저해상도 Natural Earth II 지도를 사용한다. 카메라 높이 3000km 미만에서는 래스터를 숨기고 색상 폴리곤을 표시해 확대 시 흐려지지 않도록 한다. 지도 타일은 `/cesium/Assets/Textures/NaturalEarthII`에서 정적으로 제공하고 최대 단계는 2다. 위성 영상·유료 지형·외부 지도 API는 필요하지 않다. 경계는 일반 폴리곤과 별도의 polyline으로 표시한다. 폴리곤·마커·선에는 타원체와의 깊이 충돌을 피하는 표시용 높이를 적용한다. 이 높이는 뉴스의 실제 고도나 3D 지형이 아니다.
+초기 경계 로드는 ADM0뿐이다. 선택 국가를 확대하면 ADM1, 더 확대하면 ADM2를 로드한다. 상세 데이터는 한 국가만 유지하며 파일이 없는 국가는 정상적으로 ADM0에 머문다. 경계는 일반 폴리곤과 별도의 polyline으로 표시한다. 폴리곤·마커·선에는 타원체와의 깊이 충돌을 피하는 표시용 높이를 적용한다. 이 높이는 뉴스의 실제 고도나 3D 지형이 아니다.
+
+사용자의 2026-10-13 요청에 따라 배경 지도만 온라인 타일을 허용한다. 전 지구 화면은 기존 `/cesium/Assets/Textures/NaturalEarthII` 로컬 타일(level 0–2)을 사용한다. 3000km 미만으로 확대하면 기본 OpenStreetMap 타일을 필요한 화면 범위에서만 받아온다. 최대 level 13으로 행정구역을 식별할 정도의 상세도를 제공하며, 수동 일괄 다운로드·오프라인 타일 묶음·서버 프록시·선행 타일 다운로드는 추가하지 않는다. OSM 타일은 기본 브라우저 캐시와 Referer를 사용하며 출처 링크를 지도에 항상 표시한다. 서버에 120GB 지도를 저장하지 않는다.
+
+`VITE_OSM_TILE_URL`로 정책과 출처 표시가 호환되는 OSM 타일 서버를 설정할 수 있다. 위성 배경이 필요하면 사용자 계정의 `VITE_CESIUM_ION_TOKEN`을 설정하고 프런트를 다시 빌드한다. 토큰은 공개 브라우저용 imagery 접근 권한과 허용 origin만 부여한다. 기본 공유 토큰을 사용하지 않는다. 실제 token이 없는 현재 환경에서는 OSM만 검증했다. 개발 Vite는 프로젝트 루트 .env를 읽으며 Docker Compose는 해당 값을 빌드 인자로 전달한다. 외부 지도가 실패하면 로컬 경계 지도로 되돌아가고 화면에 연결 실패를 표시한다.
+
+Cesium 1.131의 중앙 줌은 동일한 두 방향의 cross product가 0이 되는 회전을 요청할 수 있다. 이 카메라의 길이 0 회전만 no-op으로 처리해 정규화 오류와 카메라 NaN을 막는다. 일반 회전·줌·핀치 입력은 기존 Cesium 처리로 유지한다.
+
+지역명 라벨은 배경 박스 없이 텍스트와 얇은 halo로 표시한다. 밝은 일반 지도에는 어두운 글씨·경계, 위성/로컬 배경에는 밝은 글씨·경계를 사용한다. 배경 위 지역 폴리곤은 매우 얕은 tint만 적용해 지도 정보를 가리지 않는다. 정적 행정 경계·지역 ID·뉴스 좌표·Redis 보관 규칙은 온라인 배경 타일과 분리한다.
+
+공식 근거: [Cesium imagery](https://cesium.com/learn/cesiumjs-learn/cesiumjs-imagery/), [OSM provider](https://cesium.com/learn/cesiumjs/ref-doc/OpenStreetMapImageryProvider.html), [OSM tile usage policy](https://operations.osmfoundation.org/policies/tiles/).
 
 원본 라이선스와 가공 내용은 `geo/licenses/ATTRIBUTION.md`에 기록하고 UI에 출처 링크를 표시한다.
 

@@ -2,6 +2,7 @@ import { defineConfig } from 'vite';
 import { fileURLToPath } from 'node:url';
 
 export default defineConfig({
+  envDir: '..',
   // Use Cesium's matched prebuilt bundle; its source ZIP dependency changed exports.
   resolve: { alias: [{ find: /^cesium$/, replacement: fileURLToPath(new URL(
     './node_modules/cesium/Build/Cesium/index.js', import.meta.url)) }] },

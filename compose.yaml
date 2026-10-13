@@ -117,7 +117,12 @@ services:
 
   frontend:
     image: terra-newsphere-frontend:0.1.0
-    build: {context: ., dockerfile: frontend/Dockerfile}
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        VITE_CESIUM_ION_TOKEN: ${VITE_CESIUM_ION_TOKEN:-}
+        VITE_OSM_TILE_URL: ${VITE_OSM_TILE_URL:-https://tile.openstreetmap.org/}
     ports: ["127.0.0.1:${WEB_PORT:-8080}:80"]
     depends_on:
       api: {condition: service_healthy}
