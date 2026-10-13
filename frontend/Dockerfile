@@ -1,7 +1,9 @@
 FROM node:22.16.0-bookworm-slim AS build
 WORKDIR /app
 COPY frontend/package.json frontend/package-lock.json ./
-RUN npm ci
+RUN --mount=type=secret,id=terra_ca,target=/tmp/terra_ca.crt \
+    if [ -s /tmp/terra_ca.crt ]; then export NODE_EXTRA_CA_CERTS=/tmp/terra_ca.crt; fi \
+    && npm ci
 COPY frontend ./
 RUN npm run build
 

@@ -22,6 +22,15 @@ TERRA_SKIP_TLS_VERIFY=1 sh scripts/setup.sh
 
 이 옵션은 이번 준비 실행의 uv/npm/지리 다운로드에만 적용된다. Docker 이미지 다운로드나 이미지 내부 빌드의 인증서 설정은 별도다.
 
+회사 네트워크처럼 추가 CA가 필요한 Docker 빌드는 기존에 신뢰한 CA 파일을 BuildKit secret으로 전달한다. CA나 개인키를 저장소에 넣지 않는다. TLS 검증은 유지한다.
+
+```sh
+export TERRA_CA_CERT=/absolute/path/to/trusted-ca.crt
+export COMPOSE_FILE=compose.yaml:deploy/compose.local-ca.yaml
+```
+
+이 설정 후 아래 Compose 명령을 그대로 사용한다. API·수집기·Spark 이미지는 전달된 CA를 시스템 trust store에 설치한다. 프런트는 의존성 설치 단계에만 사용한다. 추가 CA가 필요 없는 환경과 CI는 기본 compose.yaml을 사용한다.
+
 정적 지리 번들은 저장소에 포함돼 있다. 국가 경계와 한국 ADM1 17개·검증된 ADM2 189개를 제공한다. 상위 지역을 확정할 수 없는 ADM2 39개는 제외 목록에 기록했다. 준비 명령은 기존 번들을 재사용한다.
 
 ### 2. 화면·API와 데모 기사 실행
