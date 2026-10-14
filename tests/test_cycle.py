@@ -93,9 +93,13 @@ class NewsCycle(unittest.TestCase):
                                if value["location_type"] == "adm2")
         regional = copy.deepcopy(raw)
         regional["source"]["url"] = "https://example.com/district"
+        regional["collected_at"] = now.isoformat()
         regional["location_references"] = [{**admin, "role": "event", "confidence": .9}]
         district = normalize(regional, self.store.geography)
         self.assertTrue(self.store.save(district))
+        newest, next_cursor = self.store.list(limit=1)
+        self.assertEqual(newest[0].news_id, district.news_id)
+        self.assertEqual(self.store.list(limit=1, cursor=next_cursor)[0][0].news_id, article.news_id)
         self.assertEqual(self.store.list("KR", admin["adm1_id"], admin_id)[0][0].news_id, district.news_id)
         self.assertEqual(len(self.store.list("KR")[0]), 2)
         bad = copy.deepcopy(regional)
@@ -142,6 +146,8 @@ class NewsCycle(unittest.TestCase):
             self.assertEqual(marker["summary"], "Publisher-provided one line.")
             self.assertEqual(marker["thumbnail_url"], "https://example.com/small.jpg")
             self.assertTrue(marker["url"].startswith("https://example.com/"))
+            self.assertEqual(datetime.fromisoformat(marker["collected_at"]),
+                             self.store.get(marker["news_id"]).collected_at)
             bbox = "bbox=0,0,1,1&include_demo=false"
             self.assertEqual(client.get(f"/api/news/markers?{bbox}").json()["items"], [])
             unknown = client.get(f"/api/news/markers?{bbox}&include_unlocated=true").json()["items"]

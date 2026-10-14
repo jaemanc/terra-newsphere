@@ -86,7 +86,7 @@ class GdeltLimits(unittest.TestCase):
             self.assertEqual(windows[0], {"timespan": "7d", "maxrecords": 250})
             self.assertEqual(windows[min(3, len(windows) - 1)], {"timespan": "7d", "maxrecords": 250})
             if len(windows) > 4:
-                self.assertEqual(windows[-1], {"timespan": "1h", "maxrecords": 100})
+                self.assertEqual(windows[-1], {"timespan": "1h", "maxrecords": 250})
 
 
 if __name__ == "__main__":
