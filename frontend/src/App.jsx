@@ -40,6 +40,7 @@ export default function App() {
   const administrative = useRef(new Map());
   const manifest = useRef(null);
   const request = useRef(null);
+  const viewUpdate = useRef(null);
   const generation = useRef(0);
   const bubble = useRef(null);
   const mapLocale = useRef(locale);
@@ -236,6 +237,7 @@ export default function App() {
           }
         }, 450);
       };
+      viewUpdate.current = updateView;
       removeMove = globe.camera.moveEnd.addEventListener(updateView);
       updateView();
       setReady(true);
@@ -249,6 +251,7 @@ export default function App() {
       removeImageryRender?.();
       if (globe && !globe.isDestroyed()) globe.destroy();
       viewer.current = null;
+      viewUpdate.current = null;
     };
   }, []);
 
@@ -302,7 +305,8 @@ export default function App() {
     request.current = controller;
     const current = ++generation.current;
     setStatus('loading');
-    const params = new URLSearchParams({ limit: '100', cursor: String(nextCursor) });
+    const params = new URLSearchParams({ limit: '200', cursor: String(nextCursor), include_demo: 'false' });
+    if (!country) params.set('include_unlocated', 'true');
     if (country) params.set('country', country);
     if (adm1) params.set('adm1', adm1);
     if (adm2) params.set('adm2', adm2);
@@ -332,9 +336,9 @@ export default function App() {
   }, [country, adm1, adm2, view?.bbox, refresh]);
 
   useEffect(() => {
-    const timer = setInterval(() => setRefresh((value) => value + 1), 60000);
+    const timer = setInterval(() => setRefresh((value) => value + 1), items.length ? 60000 : 5000);
     return () => clearInterval(timer);
-  }, []);
+  }, [items.length > 0]);
 
   useEffect(() => {
     if (!items.length) return;
@@ -383,10 +387,16 @@ export default function App() {
   useEffect(() => {
     const globe = viewer.current;
     if (!selected || !globe || !bubble.current) return;
-    const position = Cesium.Cartesian3.fromDegrees(selected.location.longitude, selected.location.latitude, MARKER_HEIGHT);
+    const position = selected.location && Cesium.Cartesian3.fromDegrees(selected.location.longitude, selected.location.latitude, MARKER_HEIGHT);
     const update = () => {
       const element = bubble.current;
       if (!element) return;
+      if (!position) {
+        element.style.visibility = 'visible';
+        element.style.left = `${Math.max(12, globe.canvas.clientWidth - element.offsetWidth - 24)}px`;
+        element.style.top = '128px';
+        return;
+      }
       const point = Cesium.SceneTransforms.worldToWindowCoordinates(globe.scene, position);
       const visible = new Cesium.EllipsoidalOccluder(Cesium.Ellipsoid.WGS84, globe.camera.position).isPointVisible(position);
       element.style.visibility = point && visible ? 'visible' : 'hidden';
@@ -401,8 +411,9 @@ export default function App() {
   }, [selected, preview]);
 
   const title = (item) => item.translations?.[locale]?.title || item.title;
+  const summary = (item) => item.translations?.[locale]?.summary || item.summary;
   const content = preview && !preview.error ? preview.content.translations?.[locale] || preview.content : null;
-  const shownItems = items.filter((item) => item.locations.length);
+  const shownItems = items;
   const mapPath = [country && countryName(country, locale),
     regionName(regions.adm1.find(item => item.region_id === adm1)?.name, locale),
     regionName(regions.adm2.find(item => item.region_id === adm2)?.name, locale)].filter(Boolean).join(' › ');
@@ -414,7 +425,8 @@ export default function App() {
         .filter((item) => item.properties?.country_code?.getValue() === code)
         .flatMap((item) => item.polygon?.hierarchy.getValue().positions || []);
       if (positions.length) {
-        viewer.current.camera.flyTo({ destination: Cesium.Rectangle.fromCartesianArray(positions), duration: 1.2 });
+        viewer.current.camera.flyTo({ destination: Cesium.Rectangle.fromCartesianArray(positions), duration: 1.2,
+          complete: () => viewUpdate.current?.() });
         viewer.current.scene.requestRender();
       }
     }
@@ -449,14 +461,18 @@ export default function App() {
           {status === 'loading' && <p className="status">{text.loading}</p>}
           {status === 'error' && <p className="status error">{text.unavailable}</p>}
           {status === 'ok' && !shownItems.length && <p className="status">{text.empty}</p>}
-          {shownItems.map((item) => <button className={`story ${selected?.item.news_id === item.news_id ? 'active' : ''}`} key={item.news_id}
-            onClick={() => {
-              const location = item.locations[0]; setSelected({ item, location });
-              viewer.current?.camera.flyTo({ destination: Cesium.Cartesian3.fromDegrees(location.longitude, location.latitude, 2200000), duration: 1.2 });
+          {shownItems.map((item) => <article className={`story ${selected?.item.news_id === item.news_id ? 'active' : ''}`} key={item.news_id}>
+            <div className="story-meta"><span>{locationsName(item.locations, locale) || text.unlocated}</span>
+              <a href={item.url} target="_blank" rel="noopener noreferrer">{item.publisher} ↗</a></div>
+            <button className="story-open" onClick={() => {
+              const location = item.locations[0] || null; setSelected({ item, location });
+              if (location) viewer.current?.camera.flyTo({ destination: Cesium.Cartesian3.fromDegrees(location.longitude, location.latitude, 2200000), duration: 1.2,
+                complete: () => viewUpdate.current?.() });
             }}>
-            <div className="story-meta"><span>{locationsName(item.locations, locale)}</span><span>{item.is_demo ? text.demo : item.publisher}</span></div>
-            <div className="story-body"><h2>{title(item)}</h2><Thumbnail url={item.thumbnail_url} /></div>
-          </button>)}
+              <div className="story-body"><div className="story-copy"><h2>{title(item)}</h2>
+                {summary(item) && <p className="story-summary">{summary(item)}</p>}</div><Thumbnail url={item.thumbnail_url} /></div>
+            </button>
+          </article>)}
           {cursor !== null && <button className="more" disabled={status === 'loading'} onClick={() => loadNews(cursor, true)}>{text.more}</button>}
         </div>
         <a className="attribution" href="/geo/manifest.json" target="_blank" rel="noopener noreferrer">{text.attribution} ↗</a>
@@ -464,7 +480,8 @@ export default function App() {
       <section className="globe-stage" aria-label="Interactive news globe">
         <div ref={host} className="globe-layer" />
         <div className="globe-top"><span className="map-location" data-testid="map-location">{mapPath || text.all}</span><button onClick={() => {
-          chooseCountry(''); viewer.current?.camera.flyTo({ destination: Cesium.Cartesian3.fromDegrees(55, 20, 22000000), duration: 1.2 });
+          chooseCountry(''); viewer.current?.camera.flyTo({ destination: Cesium.Cartesian3.fromDegrees(55, 20, 22000000), duration: 1.2,
+            complete: () => { chooseCountry(''); viewUpdate.current?.(); } });
         }} aria-label={text.reset}>◎</button></div>
         <div className="map-legend" aria-label={text.boundaries}>
           <span><i className="country-line" />{text.country}</span>
@@ -473,7 +490,8 @@ export default function App() {
         </div>
         {globeError && <p className="globe-error">{globeError === 'webgl' ? text.globeError : text.geographyError}</p>}
         {hover && <div className="hover-preview" style={{ left: Math.min(hover.x + 15, (host.current?.clientWidth || 500) - 270), top: Math.max(10, hover.y - 55) }}>
-          <Thumbnail url={hover.item.thumbnail_url} /><div><small>{locationsName(hover.item.locations, locale)}</small><span>{title(hover.item)}</span></div>
+          <Thumbnail url={hover.item.thumbnail_url} /><div><small>{locationsName(hover.item.locations, locale)}</small><span>{title(hover.item)}</span>
+            {summary(hover.item) && <p className="story-summary">{summary(hover.item)}</p>}</div>
         </div>}
         {selected && <article ref={bubble} className="news-bubble" aria-live="polite">
           <button className="close" onClick={() => setSelected(null)} aria-label={text.close}>×</button>
@@ -481,10 +499,10 @@ export default function App() {
           <div className="bubble-body"><div className="story-meta"><span>{selected.item.publisher}</span>{selected.item.is_demo && <span>{text.demo}</span>}</div>
             <h2>{content?.title || title(selected.item)}</h2>
             <p className="news-location">{text.reportedLocation}: {preview?.locations
-              ? locationsName(preview.locations, locale) : locationName(selected.location, locale)}</p>
+              ? locationsName(preview.locations, locale) || text.unlocated : selected.location ? locationName(selected.location, locale) : text.unlocated}</p>
             {preview?.error ? <p>{text.unavailable}</p> : <p>{content?.summary || (preview ? text.noSummary : text.loading)}</p>}
-            <small>{selected.location.coordinate_source === 'capital_fallback' ? text.capital : text.centroid}</small>
-            {selected.location.association_kind === 'mentioned' && <small>{text.mentioned}</small>}
+            {selected.location && <small>{selected.location.coordinate_source === 'capital_fallback' ? text.capital : text.centroid}</small>}
+            {selected.location?.association_kind === 'mentioned' && <small>{text.mentioned}</small>}
             {preview && !preview.error && <><small>{text.original}: {preview.content.language}</small>
               <a href={preview.source.url} target="_blank" rel="noopener noreferrer">{text.source} ↗</a></>}
           </div>

@@ -56,6 +56,8 @@ class NewsCycle(unittest.TestCase):
         self.assertEqual(canonical_url("https://EXAMPLE.com:443/report?b=2&utm_campaign=a&a=1#top"),
                          "https://example.com/report?a=1&b=2")
         self.assertEqual(article_id("https://example.com/report?utm_source=x"), article_id("https://example.com/report"))
+        self.assertEqual(article_id("https://www.bbc.co.uk/news/articles/story?at_medium=RSS&at_campaign=rss"),
+                         article_id("https://www.bbc.co.uk/news/articles/story"))
         compressed = io.BytesIO()
         fips_code = next(code for code, iso in self.store.geography.data["fips_to_iso"].items() if iso == "KR")
         columns = ["", now.strftime("%Y%m%d%H%M%S"), "1", "example.com", "https://example.com/report", "", "", "", "", "",
@@ -72,6 +74,7 @@ class NewsCycle(unittest.TestCase):
         self.assertEqual(events[0]["location_references"][0]["country_code"], "KR")
 
         raw = events[0]
+        raw["content"].update(summary="Publisher-provided one line.", thumbnail_url="https://example.com/small.jpg")
         raw.update(schema_version=1, collected_at=(now - timedelta(hours=1)).isoformat())
         raw["location_references"] = [{"country_code": "KR", "role": "event", "confidence": .7}]
         article = normalize(raw, self.store.geography)
@@ -123,6 +126,11 @@ class NewsCycle(unittest.TestCase):
         unlocated = normalize(no_location, self.store.geography)
         self.store.save(unlocated)
         self.assertEqual(self.store.get(unlocated.news_id).locations, [])
+        demo_raw = copy.deepcopy(raw)
+        demo_raw["source"]["url"] = "https://example.com/flagged-demo"
+        demo_raw["is_demo"] = True
+        demo = normalize(demo_raw, self.store.geography)
+        self.store.save(demo)
 
         with TestClient(app) as client:
             self.assertEqual(client.get("/api/health").status_code, 200)
@@ -130,6 +138,16 @@ class NewsCycle(unittest.TestCase):
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.headers["cache-control"], "no-store")
             self.assertEqual(len(response.json()["items"]), 1)
+            marker = response.json()["items"][0]
+            self.assertEqual(marker["summary"], "Publisher-provided one line.")
+            self.assertEqual(marker["thumbnail_url"], "https://example.com/small.jpg")
+            self.assertTrue(marker["url"].startswith("https://example.com/"))
+            bbox = "bbox=0,0,1,1&include_demo=false"
+            self.assertEqual(client.get(f"/api/news/markers?{bbox}").json()["items"], [])
+            unknown = client.get(f"/api/news/markers?{bbox}&include_unlocated=true").json()["items"]
+            self.assertEqual([item["news_id"] for item in unknown], [unlocated.news_id])
+            real = client.get("/api/news/markers?include_demo=false").json()["items"]
+            self.assertNotIn(demo.news_id, [item["news_id"] for item in real])
             self.assertEqual(client.get(f"/api/news/{article.news_id}").json()["content"]["title"], "Original headline")
             self.assertEqual(client.get("/api/news/markers?adm1=unvalidated").status_code, 422)
             self.assertEqual(client.get("/api/news/markers?limit=10000").status_code, 422)

@@ -1,6 +1,7 @@
 """GDELT discovery + optional, explicitly configured publisher RSS metadata."""
 import json
 import logging
+import math
 import os
 import signal
 import time
@@ -18,6 +19,7 @@ from redis import Redis
 from terra_newsphere.models import RETENTION_SECONDS, article_id, canonical_url
 from terra_newsphere.geography import Geography
 from collector.gkg import enrich_locations
+from collector.feed_metadata import mentioned_locations, plain_text
 
 log = logging.getLogger("collector")
 running = True
@@ -41,10 +43,10 @@ class GdeltRateLimited(ValueError):
                 pass
 
 
-def gdelt(client: httpx.Client, query: str) -> list[dict]:
+def gdelt(client: httpx.Client, query: str, *, timespan: str = "1h", maxrecords: int = 100) -> list[dict]:
     response = client.get("https://api.gdeltproject.org/api/v2/doc/doc", params={
-        "query": query, "mode": "artlist", "format": "json", "maxrecords": 100,
-        "timespan": "1h", "sort": "datedesc"})
+        "query": query, "mode": "artlist", "format": "json", "maxrecords": maxrecords,
+        "timespan": timespan, "sort": "datedesc"})
     if response.status_code == 429:
         raise GdeltRateLimited(response)
     response.raise_for_status()
@@ -77,8 +79,13 @@ def gdelt(client: httpx.Client, query: str) -> list[dict]:
     return events
 
 
-def rss(client: httpx.Client, feed_url: str, policy: dict) -> list[dict]:
-    response = client.get(feed_url)
+def rss(client: httpx.Client, feed_url: str, policy: dict, geography: Geography | None = None) -> list[dict]:
+    try:
+        response = client.get(feed_url)
+    except (httpx.ConnectError, httpx.ConnectTimeout, httpx.RemoteProtocolError):
+        log.warning("RSS transport failed; retrying once after 1s")
+        time.sleep(1)
+        response = client.get(feed_url)
     response.raise_for_status()
     feed = feedparser.parse(response.content)
     events = []
@@ -88,16 +95,27 @@ def rss(client: httpx.Client, feed_url: str, policy: dict) -> list[dict]:
             continue
         published_at = datetime(*published[:6], tzinfo=timezone.utc)
         content = {"title": entry.title, "language": feed.feed.get("language") or "und"}
+        if policy.get("allow_summaries") and entry.get("summary"):
+            summary = plain_text(entry.summary)
+            if summary:
+                content["summary"] = summary[:2000]
         # Feed policies require operator verification of hotlink/thumbnail permission.
         if policy.get("allow_thumbnails"):
             thumbnails = entry.get("media_thumbnail", [])
-            if thumbnails and thumbnails[0].get("url", "").startswith("https://"):
-                content["thumbnail_url"] = thumbnails[0]["url"]
-        events.append({"source": {"provider": "RSS", "publisher": feed.feed.get("title") or
+            for thumbnail in thumbnails:
+                image = thumbnail.get("url", "")
+                allowed = policy.get("thumbnail_hosts", [])
+                if image.startswith("https://") and (not allowed or urlsplit(image).hostname in allowed):
+                    content["thumbnail_url"] = image
+                    break
+        references = list(policy.get("event_locations", []))
+        if geography and policy.get("allow_location_mentions"):
+            references.extend(mentioned_locations(content["title"] + " " + content.get("summary", ""), geography))
+        events.append({"source": {"provider": "RSS", "publisher": policy.get("publisher") or feed.feed.get("title") or
                                   urlsplit(feed_url).hostname, "url": entry.link},
                        "content": content, "published_at": published_at.isoformat(),
                        "source_discovered_at": published_at.isoformat(),
-                       "location_references": policy.get("event_locations", [])})
+                       "location_references": references[:20]})
     return events
 
 
@@ -120,27 +138,46 @@ def main():
     policies = json.loads(policy_file.read_text()) if policy_file.exists() else {}
     interval = max(60, int(os.environ.get("COLLECT_INTERVAL_SECONDS", "900")))
     next_gdelt_request = 0
-    gdelt_backoff = 0
+    bootstrap = True
+    initial_doc = True
+    cooldown_key = "collector:gdelt:cooldown"
+    gdelt_backoff = int(database.get(cooldown_key) or 0)
     geography = Geography()
     try:
         with httpx.Client(timeout=30, follow_redirects=True, headers={
                 "User-Agent": "TerraNewsphere/0.1 (news metadata collector)"}) as client:
             while running:
-                sources = [("GDELT", None)] + [(url, policies.get(url, {})) for url in
-                           os.environ.get("RSS_URLS", "").split(",") if url.strip()]
+                # Publish the available feeds first so a throttled DOC request cannot delay them.
+                sources = [(url.strip(), policies.get(url.strip(), {})) for url in
+                           os.environ.get("RSS_URLS", "").split(",") if url.strip()] + [("GDELT", None)]
+                if bootstrap:
+                    log.info("Initial collection: configured RSS feeds and GDELT last 7 days (up to 250 records)")
                 for source, policy in sources:
+                    if not running:
+                        break
                     if policy is None and time.monotonic() < next_gdelt_request:
                         continue
+                    if policy is None and not database.set(cooldown_key, gdelt_backoff, nx=True, ex=5):
+                        # The same Redis gate also preserves provider cooldowns across restarts.
+                        log.info("GDELT DOC deferred by the shared provider cooldown")
+                        continue
                     try:
-                        events = gdelt(client, os.environ.get("GDELT_QUERY", "(climate OR earthquake OR economy OR technology)")) if policy is None else rss(client, source.strip(), policy)
+                        events = gdelt(client, os.environ.get("GDELT_QUERY", "(climate OR earthquake OR economy OR technology)"),
+                                       timespan="7d" if initial_doc else "1h", maxrecords=250 if initial_doc else 100) \
+                            if policy is None else rss(client, source.strip(), policy, geography)
                         if policy is None:
+                            initial_doc = False
                             gdelt_backoff = 0
                             next_gdelt_request = time.monotonic() + interval
+                            database.set(cooldown_key, 0, ex=interval)
                         if policy is None and events:
+                            for event in events:
+                                event["location_references"] = mentioned_locations(event["content"]["title"], geography)
                             try:
                                 enrich_locations(client, events, geography)
                             except (httpx.HTTPError, ValueError, zipfile.BadZipFile):
-                                log.warning("GKG enrichment unavailable; keeping uncertain articles unlocated")
+                                log.warning("GKG unavailable; retaining only explicit source mentions")
+                        published = 0
                         for event in events:
                             now = datetime.now(timezone.utc)
                             discovery = datetime.fromisoformat(event["source_discovered_at"])
@@ -155,15 +192,20 @@ def main():
                                 continue
                             event.update(schema_version=1, collected_at=first)
                             producer.send(os.environ.get("KAFKA_TOPIC", "news.raw"), key=news_id, value=event).get(timeout=30)
-                        log.info("Published %d candidates from %s", len(events), "GDELT" if policy is None else "RSS")
+                            published += 1
+                        log.info("Published %d candidates from %s", published, "GDELT" if policy is None else source)
                     except GdeltRateLimited as error:
                         gdelt_backoff = min(max(interval, gdelt_backoff * 2), max(interval, 3600))
                         delay = max(gdelt_backoff, error.retry_after)
                         next_gdelt_request = time.monotonic() + delay
+                        database.set(cooldown_key, gdelt_backoff, ex=math.ceil(delay))
                         log.warning("GDELT DOC rate limited (HTTP 429 or throttle body); retry in at least %.0fs", delay)
                     except (httpx.HTTPError, ValueError, KeyError) as error:
                         log.warning("Source unavailable: %s", type(error).__name__)
                     # Redis/Kafka failure stops the process so the supervisor can restart it.
+                if bootstrap:
+                    log.info("Initial collection complete; Kafka/Spark will write validated records to Redis")
+                    bootstrap = False
                 for _ in range(interval):
                     if not running:
                         break

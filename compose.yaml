@@ -85,9 +85,8 @@ services:
       <<: *python-env
       GDELT_QUERY: ${GDELT_QUERY:-(climate OR earthquake OR economy OR technology)}
       COLLECT_INTERVAL_SECONDS: ${COLLECT_INTERVAL_SECONDS:-900}
-      RSS_URLS: ${RSS_URLS:-}
+      RSS_URLS: ${RSS_URLS-https://feeds.bbci.co.uk/news/world/rss.xml,https://feeds.bbci.co.uk/news/world/asia/rss.xml,https://feeds.bbci.co.uk/news/world/europe/rss.xml,https://feeds.bbci.co.uk/news/world/us_and_canada/rss.xml,https://feeds.bbci.co.uk/news/world/africa/rss.xml,https://feeds.bbci.co.uk/news/world/middle_east/rss.xml,https://feeds.bbci.co.uk/news/world/latin_america/rss.xml,https://feeds.bbci.co.uk/news/business/rss.xml,https://feeds.bbci.co.uk/news/technology/rss.xml,https://feeds.bbci.co.uk/news/science_and_environment/rss.xml,https://feeds.bbci.co.uk/news/uk/rss.xml}
       RSS_POLICY_FILE: /app/collector/rss-policy.json
-    profiles: [ingest]
     depends_on:
       kafka-init: {condition: service_completed_successfully}
       redis: {condition: service_healthy}
@@ -106,7 +105,6 @@ services:
       SPARK_TRIGGER_SECONDS: ${SPARK_TRIGGER_SECONDS:-30}
       SPARK_DRIVER_MEMORY: ${SPARK_DRIVER_MEMORY:-768m}
     volumes: [spark-checkpoints:/var/lib/terra/checkpoints]
-    profiles: [ingest]
     depends_on:
       kafka-init: {condition: service_completed_successfully}
       redis: {condition: service_healthy}

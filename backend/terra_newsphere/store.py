@@ -48,7 +48,8 @@ class NewsStore:
 
     def list(self, country: str | None = None, adm1: str | None = None, adm2: str | None = None,
              bbox: tuple[float, float, float, float] | None = None,
-             limit: int = 100, cursor: int = 0) -> tuple[list[News], int | None]:
+             limit: int = 100, cursor: int = 0, include_unlocated: bool = False,
+             include_demo: bool = True) -> tuple[list[News], int | None]:
         key = "news:all"
         if country:
             key = f"news:geo:country:{country}"
@@ -77,7 +78,9 @@ class NewsStore:
             if data.get("locations") == {}:
                 data["locations"] = []
             article = News.model_validate(data)
-            if bbox:
+            if article.is_demo and not include_demo:
+                continue
+            if bbox and not (include_unlocated and not article.locations):
                 west, south, east, north = bbox
                 if not any(south <= loc.latitude <= north and (
                     west <= loc.longitude <= east if west <= east else

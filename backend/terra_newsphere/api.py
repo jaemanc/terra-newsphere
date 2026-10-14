@@ -45,7 +45,8 @@ def markers(request: Request,
             adm2: Annotated[str | None, Query(max_length=160)] = None,
             bbox: Annotated[str | None, Query(max_length=100)] = None,
             limit: Annotated[int, Query(ge=1, le=200)] = 100,
-            cursor: Annotated[int, Query(ge=0, le=1000000)] = 0):
+            cursor: Annotated[int, Query(ge=0, le=1000000)] = 0,
+            include_unlocated: bool = False, include_demo: bool = True):
     if (adm1 or adm2) and not country:
         raise HTTPException(422, "Administrative filters require country")
     if adm2 and not adm1:
@@ -59,10 +60,13 @@ def markers(request: Request,
             bounds = (west, south, east, north)
         except ValueError:
             raise HTTPException(422, "bbox must be west,south,east,north") from None
-    articles, next_cursor = request.app.state.store.list(country, adm1, adm2, bounds, limit, cursor)
+    articles, next_cursor = request.app.state.store.list(country, adm1, adm2, bounds, limit, cursor,
+                                                       include_unlocated, include_demo)
     return {"items": [{"news_id": article.news_id, "title": article.content.title,
                        "language": article.content.language,
-                       "translations": {lang: {"title": text.title} for lang, text in
+                       "summary": article.content.summary,
+                       "url": article.source.url,
+                       "translations": {lang: {"title": text.title, "summary": text.summary} for lang, text in
                                         article.content.translations.items()},
                        "thumbnail_url": article.content.thumbnail_url,
                        "publisher": article.source.publisher, "locations": article.locations,

@@ -15,7 +15,7 @@ class Geography:
         self.regions = self.data["regions"]
 
     def resolve(self, reference: dict) -> Location | None:
-        # Source publisher country and headline guesses are deliberately not accepted.
+        # Accept validated source event/mention references, never publisher-country guesses.
         country = self.countries.get(reference.get("country_code"))
         if not country or reference.get("role") not in {"event", "mentioned"}:
             return None

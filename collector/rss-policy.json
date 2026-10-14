@@ -1,1 +1,134 @@
-{}
+{
+  "https://feeds.bbci.co.uk/news/world/rss.xml": {
+    "publisher": "BBC News",
+    "allow_summaries": true,
+    "allow_thumbnails": true,
+    "thumbnail_hosts": [
+      "ichef.bbci.co.uk"
+    ],
+    "allow_location_mentions": true,
+    "usage": "Individual local development RSS display; preserve supplied text/images and prominent BBC News source link. Commercial deployments require BBC permission.",
+    "terms_url": "https://www.bbc.com/pages/terms-of-use",
+    "checked_at": "2026-10-14"
+  },
+  "https://feeds.bbci.co.uk/news/world/asia/rss.xml": {
+    "publisher": "BBC News",
+    "allow_summaries": true,
+    "allow_thumbnails": true,
+    "thumbnail_hosts": [
+      "ichef.bbci.co.uk"
+    ],
+    "allow_location_mentions": true,
+    "usage": "Individual local development RSS display; preserve supplied text/images and prominent BBC News source link. Commercial deployments require BBC permission.",
+    "terms_url": "https://www.bbc.com/pages/terms-of-use",
+    "checked_at": "2026-10-14"
+  },
+  "https://feeds.bbci.co.uk/news/world/europe/rss.xml": {
+    "publisher": "BBC News",
+    "allow_summaries": true,
+    "allow_thumbnails": true,
+    "thumbnail_hosts": [
+      "ichef.bbci.co.uk"
+    ],
+    "allow_location_mentions": true,
+    "usage": "Individual local development RSS display; preserve supplied text/images and prominent BBC News source link. Commercial deployments require BBC permission.",
+    "terms_url": "https://www.bbc.com/pages/terms-of-use",
+    "checked_at": "2026-10-14"
+  },
+  "https://feeds.bbci.co.uk/news/world/us_and_canada/rss.xml": {
+    "publisher": "BBC News",
+    "allow_summaries": true,
+    "allow_thumbnails": true,
+    "thumbnail_hosts": [
+      "ichef.bbci.co.uk"
+    ],
+    "allow_location_mentions": true,
+    "usage": "Individual local development RSS display; preserve supplied text/images and prominent BBC News source link. Commercial deployments require BBC permission.",
+    "terms_url": "https://www.bbc.com/pages/terms-of-use",
+    "checked_at": "2026-10-14"
+  },
+  "https://feeds.bbci.co.uk/news/world/africa/rss.xml": {
+    "publisher": "BBC News",
+    "allow_summaries": true,
+    "allow_thumbnails": true,
+    "thumbnail_hosts": [
+      "ichef.bbci.co.uk"
+    ],
+    "allow_location_mentions": true,
+    "usage": "Individual local development RSS display; preserve supplied text/images and prominent BBC News source link. Commercial deployments require BBC permission.",
+    "terms_url": "https://www.bbc.com/pages/terms-of-use",
+    "checked_at": "2026-10-14"
+  },
+  "https://feeds.bbci.co.uk/news/world/middle_east/rss.xml": {
+    "publisher": "BBC News",
+    "allow_summaries": true,
+    "allow_thumbnails": true,
+    "thumbnail_hosts": [
+      "ichef.bbci.co.uk"
+    ],
+    "allow_location_mentions": true,
+    "usage": "Individual local development RSS display; preserve supplied text/images and prominent BBC News source link. Commercial deployments require BBC permission.",
+    "terms_url": "https://www.bbc.com/pages/terms-of-use",
+    "checked_at": "2026-10-14"
+  },
+  "https://feeds.bbci.co.uk/news/world/latin_america/rss.xml": {
+    "publisher": "BBC News",
+    "allow_summaries": true,
+    "allow_thumbnails": true,
+    "thumbnail_hosts": [
+      "ichef.bbci.co.uk"
+    ],
+    "allow_location_mentions": true,
+    "usage": "Individual local development RSS display; preserve supplied text/images and prominent BBC News source link. Commercial deployments require BBC permission.",
+    "terms_url": "https://www.bbc.com/pages/terms-of-use",
+    "checked_at": "2026-10-14"
+  },
+  "https://feeds.bbci.co.uk/news/business/rss.xml": {
+    "publisher": "BBC News",
+    "allow_summaries": true,
+    "allow_thumbnails": true,
+    "thumbnail_hosts": [
+      "ichef.bbci.co.uk"
+    ],
+    "allow_location_mentions": true,
+    "usage": "Individual local development RSS display; preserve supplied text/images and prominent BBC News source link. Commercial deployments require BBC permission.",
+    "terms_url": "https://www.bbc.com/pages/terms-of-use",
+    "checked_at": "2026-10-14"
+  },
+  "https://feeds.bbci.co.uk/news/technology/rss.xml": {
+    "publisher": "BBC News",
+    "allow_summaries": true,
+    "allow_thumbnails": true,
+    "thumbnail_hosts": [
+      "ichef.bbci.co.uk"
+    ],
+    "allow_location_mentions": true,
+    "usage": "Individual local development RSS display; preserve supplied text/images and prominent BBC News source link. Commercial deployments require BBC permission.",
+    "terms_url": "https://www.bbc.com/pages/terms-of-use",
+    "checked_at": "2026-10-14"
+  },
+  "https://feeds.bbci.co.uk/news/science_and_environment/rss.xml": {
+    "publisher": "BBC News",
+    "allow_summaries": true,
+    "allow_thumbnails": true,
+    "thumbnail_hosts": [
+      "ichef.bbci.co.uk"
+    ],
+    "allow_location_mentions": true,
+    "usage": "Individual local development RSS display; preserve supplied text/images and prominent BBC News source link. Commercial deployments require BBC permission.",
+    "terms_url": "https://www.bbc.com/pages/terms-of-use",
+    "checked_at": "2026-10-14"
+  },
+  "https://feeds.bbci.co.uk/news/uk/rss.xml": {
+    "publisher": "BBC News",
+    "allow_summaries": true,
+    "allow_thumbnails": true,
+    "thumbnail_hosts": [
+      "ichef.bbci.co.uk"
+    ],
+    "allow_location_mentions": true,
+    "usage": "Individual local development RSS display; preserve supplied text/images and prominent BBC News source link. Commercial deployments require BBC permission.",
+    "terms_url": "https://www.bbc.com/pages/terms-of-use",
+    "checked_at": "2026-10-14"
+  }
+}
