@@ -9,7 +9,7 @@ for role in api collector processor health; do
     digest=$(sha256sum "$secret")
     digest=${digest%% *}
     case "$role" in
-        api) rules='~news:* +get +zrangebyscore +zcount +zremrangebyscore' ;;
+        api) rules='~news:* +get +zrangebyscore +zrevrangebyscore +zcount +zremrangebyscore' ;;
         collector) rules='~news:seen:* ~collector:* +get +set' ;;
         processor) rules='~news:* +get +set +time +zrem +zremrangebyscore +zadd +zrange +expireat +evalsha +script|load' ;;
         health) rules='' ;;

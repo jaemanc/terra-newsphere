@@ -132,4 +132,4 @@ docs/                    데이터 계약, 지리, 운영, 재개 기록
 
 ## 공개 배포 보안
 
-Redis 서비스별 ACL/secret, nginx 반복 호출 제한과 429, K3s HTTPS 및 내부 네트워크 격리, 도메인/인증서와 DDoS 보호는 [보안 문서](docs/security.md)를 참조한다. 새 클론에서 Compose를 실행하기 전 `python3 scripts/security_setup.py`가 필요하다.
+Redis 서비스별 ACL/secret, nginx 반복 호출 제한과 429, K3s HTTPS 및 내부 네트워크 격리, 도메인/인증서와 DDoS 보호는 [보안 문서](docs/security.md)를 참조한다. 민감한 값은 Git에서 제외되는 `.env`에서 관리한다. `.env.example`에는 값 없는 설정만 있으며, `python3 scripts/security_setup.py`가 기존 비밀번호를 유지해 `.env`와 컨테이너 secret 파일을 준비한다. Compose를 실행하기 전에 이 명령을 실행한다.

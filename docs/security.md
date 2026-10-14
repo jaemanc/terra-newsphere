@@ -6,7 +6,7 @@
 
 Redis 7.4.11을 사용하고 default 사용자를 비활성화한다. 서비스마다 별개의 256-bit 무작위 비밀번호와 ACL 사용자(api, collector, processor, health)를 사용한다. API는 기사 조회와 만료 인덱스 정리만, collector는 최초 수집 시각/쿨다운만, processor는 뉴스 및 인덱스 갱신과 기존 Lua 로딩/실행만, health는 ping만 허용한다. Lua는 적재에 필요하므로 전체 차단하지 않는다. 관리자 CONFIG/FLUSH/ACL 명령은 서비스에 허용하지 않는다.
 
-비밀번호는 `python3 scripts/security_setup.py`로 한 번 생성한다. `.runtime/security`는 Git/Docker build context에서 제외되고 기존 비밀번호는 덮어쓰지 않는다. 호스트 디렉터리는 0700이며 Compose bind secrets의 서로 다른 UID가 읽을 수 있도록 내부 파일은 0444다. 실제 비밀번호는 Compose secrets 또는 K3s Secret의 파일로만 마운트한다. env에는 사용자명·파일 경로만 둔다. 비밀번호를 Git, CLI 인자, 프런트 빌드 변수에 넣지 않는다.
+민감한 값의 로컬 원본은 Git/Docker build context에서 제외되는 `.env`다(0600). `REDIS_API_PASSWORD`, `REDIS_COLLECTOR_PASSWORD`, `REDIS_PROCESSOR_PASSWORD`, `REDIS_HEALTH_PASSWORD`를 관리한다. `python3 scripts/security_setup.py`는 기존 secret을 같은 값으로 가져오거나 비어 있는 값에 256-bit 비밀번호를 생성하고, `.env`에서 컨테이너용 `.runtime/security` 파일을 만든다. `.env.example`에는 비밀번호 값이 없다. `.env`를 바꿔 비밀번호를 교체할 때는 setup을 다시 실행하고 Redis와 관련 서비스를 함께 재시작한다. 호스트 secret 디렉터리는 0700이며 서로 다른 컨테이너 UID가 읽을 수 있도록 내부 파일은 0444다. 컨테이너에는 Compose secrets/K3s Secret 파일만 마운트하고 환경 변수에는 사용자명·파일 경로만 전달한다. 비밀번호를 Git, CLI 인자, 프런트 빌드 변수에 넣지 않는다.
 
 Compose는 web-entry / storage / ingestion 네트워크를 분리하며 frontend에는 Redis/Kafka 네트워크나 비밀번호가 없다. K3s는 기본 ingress/egress를 거부하고 nginx→API, API/collector/Spark→Redis, collector/Spark/init→Kafka만 허용한다. collector의 인터넷 HTTPS와 DNS만 추가 허용하며 사설 IP·클라우드 메타데이터 IP로의 인터넷 egress는 제외한다. K3s CNI가 정책을 실제 집행하는지 배포 후 검증한다.
 
