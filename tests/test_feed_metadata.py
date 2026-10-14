@@ -1,6 +1,7 @@
 import unittest
 from datetime import datetime, timezone
 from email.utils import format_datetime
+from unittest.mock import patch
 
 import httpx
 
@@ -43,6 +44,31 @@ class FeedMetadata(unittest.TestCase):
         refs = mentioned_locations("Nigeria news: UK and US talks", geography)
         self.assertEqual({ref["country_code"] for ref in refs}, {"NG", "GB", "US"})
         self.assertEqual(plain_text("<p>Safe <b>snippet</b> &amp; text.</p><script>hidden()</script>"), "Safe snippet & text.")
+
+    def test_retry_only_transient_rss_transport_once(self):
+        attempts = []
+
+        def transient(request):
+            attempts.append(request)
+            if len(attempts) == 1:
+                raise httpx.RemoteProtocolError("Upstream connection closed")
+            return httpx.Response(200, text="<rss><channel /></rss>")
+
+        with httpx.Client(transport=httpx.MockTransport(transient)) as client, \
+                patch("collector.main.time.sleep") as sleep:
+            self.assertEqual(rss(client, "https://example.com/feed", {}), [])
+            sleep.assert_called_once_with(1)
+        self.assertEqual(len(attempts), 2)
+        attempts.clear()
+
+        def throttled(request):
+            attempts.append(request)
+            return httpx.Response(429)
+
+        with httpx.Client(transport=httpx.MockTransport(throttled)) as client:
+            with self.assertRaises(httpx.HTTPStatusError):
+                rss(client, "https://example.com/feed", {})
+        self.assertEqual(len(attempts), 1)
 
 
 if __name__ == "__main__":

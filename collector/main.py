@@ -80,7 +80,12 @@ def gdelt(client: httpx.Client, query: str, *, timespan: str = "1h", maxrecords:
 
 
 def rss(client: httpx.Client, feed_url: str, policy: dict, geography: Geography | None = None) -> list[dict]:
-    response = client.get(feed_url)
+    try:
+        response = client.get(feed_url)
+    except (httpx.ConnectError, httpx.ConnectTimeout, httpx.RemoteProtocolError):
+        log.warning("RSS transport failed; retrying once after 1s")
+        time.sleep(1)
+        response = client.get(feed_url)
     response.raise_for_status()
     feed = feedparser.parse(response.content)
     events = []

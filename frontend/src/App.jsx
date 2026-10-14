@@ -40,6 +40,7 @@ export default function App() {
   const administrative = useRef(new Map());
   const manifest = useRef(null);
   const request = useRef(null);
+  const viewUpdate = useRef(null);
   const generation = useRef(0);
   const bubble = useRef(null);
   const mapLocale = useRef(locale);
@@ -236,6 +237,7 @@ export default function App() {
           }
         }, 450);
       };
+      viewUpdate.current = updateView;
       removeMove = globe.camera.moveEnd.addEventListener(updateView);
       updateView();
       setReady(true);
@@ -249,6 +251,7 @@ export default function App() {
       removeImageryRender?.();
       if (globe && !globe.isDestroyed()) globe.destroy();
       viewer.current = null;
+      viewUpdate.current = null;
     };
   }, []);
 
@@ -422,7 +425,8 @@ export default function App() {
         .filter((item) => item.properties?.country_code?.getValue() === code)
         .flatMap((item) => item.polygon?.hierarchy.getValue().positions || []);
       if (positions.length) {
-        viewer.current.camera.flyTo({ destination: Cesium.Rectangle.fromCartesianArray(positions), duration: 1.2 });
+        viewer.current.camera.flyTo({ destination: Cesium.Rectangle.fromCartesianArray(positions), duration: 1.2,
+          complete: () => viewUpdate.current?.() });
         viewer.current.scene.requestRender();
       }
     }
@@ -462,7 +466,8 @@ export default function App() {
               <a href={item.url} target="_blank" rel="noopener noreferrer">{item.publisher} ↗</a></div>
             <button className="story-open" onClick={() => {
               const location = item.locations[0] || null; setSelected({ item, location });
-              if (location) viewer.current?.camera.flyTo({ destination: Cesium.Cartesian3.fromDegrees(location.longitude, location.latitude, 2200000), duration: 1.2 });
+              if (location) viewer.current?.camera.flyTo({ destination: Cesium.Cartesian3.fromDegrees(location.longitude, location.latitude, 2200000), duration: 1.2,
+                complete: () => viewUpdate.current?.() });
             }}>
               <div className="story-body"><div className="story-copy"><h2>{title(item)}</h2>
                 {summary(item) && <p className="story-summary">{summary(item)}</p>}</div><Thumbnail url={item.thumbnail_url} /></div>
@@ -475,7 +480,8 @@ export default function App() {
       <section className="globe-stage" aria-label="Interactive news globe">
         <div ref={host} className="globe-layer" />
         <div className="globe-top"><span className="map-location" data-testid="map-location">{mapPath || text.all}</span><button onClick={() => {
-          chooseCountry(''); viewer.current?.camera.flyTo({ destination: Cesium.Cartesian3.fromDegrees(55, 20, 22000000), duration: 1.2 });
+          chooseCountry(''); viewer.current?.camera.flyTo({ destination: Cesium.Cartesian3.fromDegrees(55, 20, 22000000), duration: 1.2,
+            complete: () => { chooseCountry(''); viewUpdate.current?.(); } });
         }} aria-label={text.reset}>◎</button></div>
         <div className="map-legend" aria-label={text.boundaries}>
           <span><i className="country-line" />{text.country}</span>

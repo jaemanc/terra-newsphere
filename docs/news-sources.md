@@ -1,6 +1,8 @@
 # Actual news collection
 
-The collector starts its first collection immediately, before the recurring interval. It fetches each configured RSS feed (up to 100 available entries per feed), publishes entries from the last seven days, then performs the initial GDELT DOC lookup over `7d` with `maxrecords=250`. This is a bounded bootstrap of available recent coverage, not a complete global archive. If DOC is throttled, its initial lookup remains pending until a successful response; RSS continues. Later DOC requests use `1h`/100 and the normal interval.
+A normal `docker compose up` starts the collector and Spark as well as the API/frontend; ingestion is no longer an opt-in profile. The collector starts its first collection immediately, before the recurring interval. It fetches each configured RSS feed (up to 100 available entries per feed), publishes entries from the last seven days, then performs the initial GDELT DOC lookup over `7d` with `maxrecords=250`. This is a bounded bootstrap of available recent coverage, not a complete global archive. If DOC is throttled, its initial lookup remains pending until a successful response; RSS continues. Later DOC requests use `1h`/100 and the normal interval.
+
+RSS retries a transient connection/protocol failure once after one second; HTTP rate-limit status responses are not immediately retried.
 
 Every initial and recurring event follows collector → `news.raw` → single local Spark application → validated Redis record and region indexes. No separate bootstrap datastore or direct unvalidated Redis seed is used. Redis may take several Spark microbatches to fill. The empty frontend refreshes every five seconds, then every minute after data arrives. Recollection preserves the first collection time and the original seven-day expiry.
 
