@@ -140,3 +140,16 @@ Hobby의 2 vCPU / 8GB / 32GB는 빌드 자원이다. 프런트만 Vercel에 두�
 - 프런트 이미지 빌드·Compose 설정 검사가 통과했다. 최초 연결 검사는 `ImageryLayerCollection.add()`가 반환값이 없는 것을 수정했다. 확대 검사는 실제 OSM 응답 200을 확인했지만 화면 중앙 줌에서 Cesium 1.131의 zero-axis 정규화 오류로 렌더링이 중단됐다. Unminified 엔진 스택이 `handleZoom → Camera.rotate → Quaternion.fromAxisAngle`인 것을 확인하고, 해당 카메라의 길이 0 회전만 no-op 처리했다. 수정 프런트 ARM64 이미지와 Docker 컨테이너 교체를 완료했다. Docker localhost:8080에서 실제 OSM level 13 타일 응답 200, 중앙 휠 확대, ADM2 계층, 출처 표시, 모바일, 외부 타일 중단 시 로컬 fallback이 통과했고 console/page/렌더 오류는 없었다. 같은 구성의 Unminified 개발 화면에서도 재현 검사가 통과했다. 뉴스/저장 구성은 바뀌지 않아 기존 파이프라인 검증을 반복하지 않는다. 필수 CI 통과 후 dev에 병합한다.
 
 - 마지막 화면 확인에서 비동기 경계 생성 완료 전에 렌더 요청이 끝나는 경우를 확인했다. 데이터 소스가 준비 중이거나 ready로 전환하는 프레임에만 렌더를 요청하고, 경계선은 ground-clamped polyline과 고정 색상으로 표시한다. 준비 후 idle 렌더 모드는 유지한다. 영향받은 프런트 이미지와 확대/모바일/fallback 검사는 다시 통과했다.
+
+## 2026-10-13 NASA Blue Marble Base Map 표면 교체
+- 앞선 온라인 지도 PR #7은 ARM64 CI 38363229552 통과 후 dev merge commit `0aca1a6`으로 병합했다.
+- 사용자가 NASA Blue Marble Base Map을 지정하고 구름층 제외를 요청했다. `feature/nasa-blue-marble`에서 NASA 공식 Base Map의 2004년 7월 21600×10800(2km/pixel) JPEG와 출처를 확인했다.
+- 기존 전 지구 Natural Earth II level 0–2 표면을 NASA Base Map 로컬 geographic XYZ level 0–4로 교체했다. 최고 단계는 원본을 그대로 분할하고 아래 단계만 축소한다. 675px 타일 682개, 총 33,441,965바이트다.
+- 원본과 가공 타일 SHA256, 생성 방법과 Pillow 12.0.0 버전을 기록했다. 원본은 .cache에만 두고, Pillow는 별도의 오프라인 생성 명령에서만 사용한다. 런타임 뉴스 저장 구조·위치 좌표·행정구역 ID·상세 지도 전환은 유지한다.
+- 타일 생성과 프런트 이미지 빌드를 진행했다. 실제 Docker의 전 지구·대륙 확대·한국 상세 지도 전환과 구름층 없는 표면/출처 표시를 확인 중이다.
+
+## 2026-10-14 NASA 표면 검증 재개
+- 기존 타일 682개를 재사용하고 전체 타일 grid와 SHA256이 모두 일치하는 것을 확인했다. 재다운로드·재가공을 하지 않았다.
+- Docker Hub node/nginx 메타데이터 요청이 두 차례 TLS handshake timeout으로 실패했다. 기존 정상 서비스는 계속 실행 중이며 새 NASA 프런트 이미지로 교체됐다는 주장은 하지 않았다.
+- 로컬 검증은 설치된 고정 프런트 의존성으로 빌드하고 기존 검증된 linux/arm64 nginx 프런트 이미지에 새 정적 결과를 넣는 임시 빌드로 이어간다. 기본 Dockerfile은 유지하고 GitHub ARM64 CI에서 정상 전체 빌드를 확인한다.
+- 고정 의존성의 호스트 프런트 빌드와 기존 linux/arm64 nginx 이미지 기반 정적 결과 교체가 성공했다. Docker localhost:8080의 Chrome 검사에서 NASA level 0–4 응답 200, 이전 표면 요청 없음, 국가 경계, 대륙 확대, 한국 OSM 상세 전환, NASA 출처와 모바일을 확인했다. console/page/렌더 오류는 0개다. 실제 일반 Dockerfile 빌드는 필수 GitHub ARM64 CI에서 확인한다.
