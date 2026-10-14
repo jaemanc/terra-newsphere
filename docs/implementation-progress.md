@@ -153,3 +153,10 @@ Hobby의 2 vCPU / 8GB / 32GB는 빌드 자원이다. 프런트만 Vercel에 두�
 - Docker Hub node/nginx 메타데이터 요청이 두 차례 TLS handshake timeout으로 실패했다. 기존 정상 서비스는 계속 실행 중이며 새 NASA 프런트 이미지로 교체됐다는 주장은 하지 않았다.
 - 로컬 검증은 설치된 고정 프런트 의존성으로 빌드하고 기존 검증된 linux/arm64 nginx 프런트 이미지에 새 정적 결과를 넣는 임시 빌드로 이어간다. 기본 Dockerfile은 유지하고 GitHub ARM64 CI에서 정상 전체 빌드를 확인한다.
 - 고정 의존성의 호스트 프런트 빌드와 기존 linux/arm64 nginx 이미지 기반 정적 결과 교체가 성공했다. Docker localhost:8080의 Chrome 검사에서 NASA level 0–4 응답 200, 이전 표면 요청 없음, 국가 경계, 대륙 확대, 한국 OSM 상세 전환, NASA 출처와 모바일을 확인했다. console/page/렌더 오류는 0개다. 실제 일반 Dockerfile 빌드는 필수 GitHub ARM64 CI에서 확인한다.
+- PR #8의 GitHub ARM64 CI 38494381788(Branch policy/Validate)이 성공해 일반 Dockerfile 전체 이미지 빌드와 Kafka→Spark→Redis→API 검증을 확인했다. dev에 merge commit `d973202`로 병합했다. Git HTTPS의 HTTP/2 전송 오류는 이번 push에만 HTTP/1.1을 적용해 해결했다.
+
+## 2026-10-14 GDELT 호출 제한 처리
+- 사용자 제보와 기존 수집기 로그를 확인했다. DOC 호출은 기본 약 15분 간격이고 HTTP 429가 반복됐다. HTTP 200이라고 본문이 정상 JSON이라는 보장은 없으며, 단일 컨테이너가 5초 미만으로 DOC를 반복 호출했다는 증거는 없다.
+- `feature/gdelt-backoff`에서 HTTP 200 제한 안내와 HTTP 429를 명시적으로 분류한다. 기본 간격의 지수 대기(900→1800→3600초), 숫자/HTTP-date Retry-After 존중, 성공 후 대기 초기화와 GDELT만 건너뛰는 처리를 추가했다. RSS 주기는 유지하며 빈 DOC 결과에서는 GKG 네트워크 요청을 생략한다.
+- 응답 분류·최소 간격·지수 대기·정상화·RSS 유지·긴 Retry-After를 모의 HTTP/시계로 확인한다. 추가 실제 API 시험 호출은 하지 않는다. 수정 수집기 이미지와 dev 통합 검증을 진행한다.
+- 영향받은 격리 Redis/API/수집/지리 검사 5개가 모두 통과했다. 일반 Dockerfile의 수집기 linux/arm64 빌드와 컨테이너 교체도 성공했다. 새 컨테이너의 첫 DOC 요청은 여전히 HTTP 429였고 `retry in at least 900s`를 기록해 오류를 정상적으로 대기 처리했다. 제공자 제한이 해제됐거나 실제 기사 수집이 성공했다고 주장하지 않는다.
