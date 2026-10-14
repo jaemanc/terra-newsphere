@@ -66,6 +66,7 @@ export default function App() {
     let handler;
     let timer;
     let removeMove;
+    let newsResize;
     let removeReadyRender;
     let removeImageryError;
     let removeImageryRender;
@@ -173,8 +174,8 @@ export default function App() {
         cluster.label.outlineWidth = 3;
         cluster.label.style = Cesium.LabelStyle.FILL_AND_OUTLINE;
         cluster.label.showBackground = false;
-        cluster.label.horizontalOrigin = Cesium.HorizontalOrigin.LEFT;
-        cluster.label.pixelOffset = new Cesium.Cartesian2(18, -12);
+        cluster.label.horizontalOrigin = Cesium.HorizontalOrigin.CENTER;
+        cluster.label.pixelOffset = new Cesium.Cartesian2(0, -20);
         cluster.billboard.show = false;
         cluster.point.show = true;
         cluster.point.id = representative;
@@ -184,6 +185,11 @@ export default function App() {
         cluster.point.outlineWidth = 2;
         globe.scene.requestRender();
       });
+      newsResize = new ResizeObserver(() => {
+        news.clustering.pixelRange = globe.canvas.clientWidth < 600 ? 80 : 64;
+        globe.scene.requestRender();
+      });
+      newsResize.observe(host.current);
       markers.current = news;
       globe.dataSources.add(news);
       Promise.all([
@@ -256,7 +262,7 @@ export default function App() {
       setGlobeError('webgl');
     }
     return () => {
-      alive = false; clearTimeout(timer); removeMove?.(); handler?.destroy();
+      alive = false; clearTimeout(timer); removeMove?.(); newsResize?.disconnect(); handler?.destroy();
       removeReadyRender?.();
       removeImageryError?.();
       removeImageryRender?.();
@@ -386,7 +392,7 @@ export default function App() {
             font: '600 12px sans-serif', fillColor: Cesium.Color.WHITE,
             outlineColor: Cesium.Color.fromCssColorString('#17120d'), outlineWidth: 3,
             style: Cesium.LabelStyle.FILL_AND_OUTLINE, showBackground: false,
-            horizontalOrigin: Cesium.HorizontalOrigin.LEFT, pixelOffset: new Cesium.Cartesian2(12, -12),
+            horizontalOrigin: Cesium.HorizontalOrigin.CENTER, pixelOffset: new Cesium.Cartesian2(0, -20),
           },
         });
         entity.news = item; entity.newsLocation = location;
