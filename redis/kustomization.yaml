@@ -3,4 +3,4 @@ kind: Kustomization
 resources: [k3s.yaml]
 configMapGenerator:
   - name: redis-config
-    files: [redis.conf]
+    files: [redis.conf, start.sh]

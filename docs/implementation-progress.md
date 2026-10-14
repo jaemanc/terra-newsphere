@@ -180,6 +180,23 @@ Hobby의 2 vCPU / 8GB / 32GB는 빌드 자원이다. 프런트만 Vercel에 두�
 - 일반 Compose 시작에도 초기 수집이 수행되도록 collector/Spark의 opt-in ingest profile을 제거했다. 기존 --profile ingest 명령은 호환되며 정적 지리와 뉴스 저장 구조는 유지한다. 실제 뉴스 원문 캐시/화면 캡처는 확인 뒤 삭제해 Redis 밖의 장기 뉴스 사본을 남기지 않는다.
 - 수정 프런트 이미지와 Chrome 재검사를 통과했다. 실제 뉴스 200건 초기 목록/더 보기(전체 202건), 정상 source 이미지, 한 줄 설명, 미확인/언급 위치 preview, 마커 hover, 초기화 후 국가 빈값·상세 모드 해제·글로벌 목록 복귀, 모바일, page 오류 0을 확인했다. 일반 `docker compose up -d --wait`도 성공해 6개 서비스의 기본 실행과 초기 수집 구성을 확인했다. 필수 ARM64 CI 후 dev 병합한다.
 
+## 2026-10-14 공개 배포 보안 강화
+- `feature/security-hardening`은 dev에서 시작했다. 작업 시작 시 있던 지구본 헤드라인/UI와 markers의 collected_at 변경은 보존하며 보안 변경과 혼동하지 않는다.
+- Redis 7.4.11/서비스별 ACL·파일 secret, Compose 네트워크 분리, K3s ingress/egress 기본 거부와 서비스별 허용, non-root·권한 제한을 연결했다. 기존 정적 지리·Redis 뉴스 7일 보존·Spark 4.0.2 local[1]은 유지한다.
+- nginx 1.30.5/8080 non-root에서 API 요청률·동시 요청 제한(429), 보안 헤더와 시간 제한을 적용한다. K3s API도 Traefik→nginx→FastAPI로 바꿔 제한을 우회하지 않으며 HTTPS redirect/HSTS Middleware를 추가했다.
+- bounded HTTPS source download와 same-origin redirect 검증, FastAPI/Starlette/kafka-python 보안 버전 고정을 추가했다. 도메인·무료 인증서·외부 DDoS/CDN·원본 방화벽과 내부 인증 범위를 docs/security.md에 기록했다.
+- 구현은 진행 중이며 통합 검증 결과는 아직 기록하지 않는다. 실제 OCI 서버/도메인/TLS 발급·Cloudflare 연결은 수행하지 않았다.
+
+## 2026-10-14 지구본 헤드라인 dev 병합 결과
+- 주황색 마커·배경 없는 한 줄 헤드라인/말줄임 ...·클러스터 대표 기사 hover/click·실뉴스 수집 확대는 별도 worktree `.runtime/headlines-worktree`에서 완료했다. PR #12는 최종 head `a6297a9`의 ARM64 CI 38533637537(Branch policy/Validate) 통과 후 dev `0ee4a8d`로 병합됐다.
+- 실제 Kafka→Spark→Redis 뉴스 638개(BBC 388/GDELT 250, 위치 있음 159, 데모 0), 브라우저 초기 200+200+100/500개와 데스크톱/모바일/resize/hover/click/page 오류 0을 확인했다. 실뉴스 캡처는 삭제했다. 별도 Docker 검증 화면은 localhost:8081이며 기존 보안 작업 파일과 컨테이너를 덮어쓰지 않았다.
+- 보안 브랜치 통합 시 최신 목록 조회의 Redis 명령 `ZREVRANGEBYSCORE`를 API 역할 ACL에 허용해야 한다. 현재 보안 draft의 API ACL은 이전 `ZRANGEBYSCORE`만 허용한다. 실제 보안 배포는 이 통합 검증 후 진행한다.
+- 검증 완료: Python/보안 경계 검사 10개, 프런트 빌드, Compose/Kustomize가 통과했고 이미지 4개 모두 ARM64다. FastAPI 0.143.0·Starlette 1.3.1·kafka-python 2.3.2로 갱신한 Python 의존성 audit는 알려진 취약점 0건이다.
+- Redis 7.4.11 ACL과 non-root nginx 1.30.5가 실제 로컬에서 실행된다. Redis 무인증 거부, API의 쓰기/Lua 거부, collector의 기사 접근 거부, processor의 관리자 명령 거부를 확인했다. frontend는 Redis/Kafka의 DNS 이름과 직접 IP 모두 접속하지 못한다. 보안 헤더, X-Forwarded-For 조작에도 429 발생, 5초 후 정상 회복을 확인했다.
+- Docker Desktop에서 internal web 네트워크의 published port가 연결되지 않아 웹 입구만 별도 web-entry 네트워크로 수정했다. storage는 internal, Kafka는 별도 ingestion 네트워크로 유지하며 이 변경의 웹/격리 검사를 다시 통과했다.
+- 휘발 Redis 교체 때 기존 기사 JSON 직접 복원은 일부 지리 데이터 불일치로 중단됐다. 디스크 기사 백업을 남기지 않고 Kafka 원본 3727개에서 639개 URL을 bounded replay해 원래 collected_at으로 복구했다. 첫 수집 시각 gate도 원래 만료로 복원하고, GDELT는 보수적인 1시간 cooldown으로 재시작 호출을 억제했다. 642개 기사에서 최초 시각/만료 정합성을 확인했다.
+- Kafka 복구 backlog로 최초 신규 데모 전달 검사는 90초를 넘겼다. 동일 검증 이벤트가 처리된 뒤 재전송/새 데모 추가 없이 같은 URL로 Kafka→Spark→Redis→FastAPI→nginx 전달 성공을 확인했다. 이미 통과한 전체 테스트/빌드는 반복하지 않았다. 로컬 서비스는 실행 상태로 유지한다. OCI/K3s 실제 네트워크 정책·공인 HTTPS·외부 DDoS 보호는 서버/도메인 준비 후 검증해야 한다.
+
 ## 2026-10-14 주황색 뉴스 마커·지구본 한 줄 헤드라인·수집 확대
 - 실제 뉴스 PR #11은 ARM64 CI 38523150087 통과 후 dev `d9dc1bd`로 병합됐다. `feature/globe-headlines`에서 이번 요청의 미완료 작업만 진행한다. 기존 NASA/상세 지도 전환과 초기 수집·썸네일은 유지한다.
 - 시작 시 실데이터는 460개(위치 있음 125개)였지만 브라우저 첫 요청은 200개였다. 마커와 클러스터를 주황색/밝은 윤곽으로 바꾸고, 항상 보이는 한 줄 헤드라인을 추가했다. 긴 제목은 Unicode 문자 단위로 26자(좁은 화면 18자) 뒤 literal ...를 붙인다. 클러스터도 숫자 대신 가장 최근 기사의 제목을 표시하며 hover/click은 그 기사와 연결한다. 박스 배경과 가상의 조회수는 추가하지 않는다.
@@ -191,3 +208,10 @@ Hobby의 2 vCPU / 8GB / 32GB는 빌드 자원이다. 프런트만 Vercel에 두�
 - 최종 Chrome 데스크톱/390px 모바일에서 첫 로딩부터 주황색 클러스터·배경 없는 한 줄 헤드라인·말줄임 ...를 확인했다. 실제 클러스터 hover/click은 같은 대표 기사와 HTTPS 원문 링크를 열었다. 초기 요청은 200+200+100 세 페이지/500개이고 page 오류 0개다. YAML/Compose 설정도 통과했다. 실뉴스 캡처는 확인 뒤 삭제하며 필수 ARM64 PR CI 후 dev만 병합한다.
 - 모바일 resize 후 클러스터 제목 길이가 데스크톱 값으로 남는 것을 확인해 ResizeObserver로 화면 폭에 맞춰 다시 묶는다(64px/80px). 캡션을 마커 위 중앙으로 옮겨 작은 화면의 가장자리 잘림도 줄인다. 프런트 영향 범위만 다시 확인한다.
 - 모바일 조정 후 데스크톱/390px 첫 로딩·resize, 실제 클러스터 hover/click, 초기 3페이지/500개와 page 오류 0을 재확인했다. 18자 캡션이 다시 계산되며 화면 밖으로 잘리지 않는다. 프런트 ARM64 이미지도 재빌드했다.
+
+## 2026-10-14 보안·지도 통합과 8080 단일 실행
+- 사용자가 보안 작업 완료 후 8080 통합 및 .env 민감값 관리·커밋·푸시를 요청했다. 보안 작업을 `08a6ad4`로 보존한 뒤 dev `0ee4a8d`를 병합했고 문서 충돌은 양쪽 기록을 유지해 해결했다. 최신 목록/주황색 캡션/20개 RSS와 보안 설정을 함께 검증한다.
+- API ACL에 최신 조회 명령 ZREVRANGEBYSCORE를 추가한다. 기존 Redis 비밀번호를 그대로 .env(0600)로 가져오고, 컨테이너에는 파생 secret 파일만 마운트한다. .env.example에는 빈 설정만 남기며 Git/Docker 제외를 유지한다. Redis ACL 적용 재시작은 메모리 안에서 기사/원래 수집·만료를 보존하고 복구하며 디스크 뉴스 사본을 만들지 않는다. 검증 후 임시 8081 컨테이너를 정리한다.
+- 통합 Python/보안 검사 11개, Node 2개, Compose/Kustomize와 일반 Dockerfile 이미지 4개 ARM64 빌드가 통과했다. .env 기존 비밀번호 4개 유지·0600·Git/Docker 제외·Git 추적 파일에 실제 값 없음도 확인했다. ACL 재시작 전 기존 레코드 651개를 메모리에서만 보존하고 원래 collected_at/expires_at으로 651개 모두 복구했다(만료 0개). 디스크 뉴스 사본은 없다.
+- 8080에서 6개 서비스를 다시 실행했고 20개 RSS 초기 수집이 Kafka/Spark를 거쳐 처리됐다. GDELT는 유지한 cooldown으로 추가 호출을 억제했다. 실제 뉴스 642개/위치 있음 161개이며 ACL 금지 명령·무인증 거부·frontend DNS/IP 격리·헤더·429 회복 검사도 통과했다. 최종 Chrome/커밋·PR 검증과 임시 8081 정리를 이어간다.
+- 최종 Chrome 8080 데스크톱/390px 모바일에서 200+200+100/500개, 주황색 한 줄 캡션/말줄임, 실제 클러스터 hover/click·원문 안전 링크, 렌더/page 오류 0을 확인했다. GDELT 원문 URL은 HTTP도 제공하므로 검증은 원래 HTTP/HTTPS 주소를 허용한다. 캡처는 확인 후 삭제했다. 임시 8081 frontend/API/collector/Spark/Redis 컨테이너는 제거해 8080의 단일 수집기·단일 Spark/Redis 실행만 남겼다.

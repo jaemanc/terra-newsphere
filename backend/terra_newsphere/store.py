@@ -1,5 +1,4 @@
 import json
-import os
 import time
 from pathlib import Path
 
@@ -7,15 +6,14 @@ from redis import Redis
 
 from .geography import Geography
 from .models import News
+from .connection import redis_client
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
 class NewsStore:
     def __init__(self, client: Redis | None = None, geography: Geography | None = None):
-        self.redis = client if client is not None else Redis.from_url(
-            os.environ.get("REDIS_URL", "redis://localhost:6379/0"), decode_responses=True,
-            socket_connect_timeout=3, socket_timeout=5)
+        self.redis = client if client is not None else redis_client()
         self.geography = geography if geography is not None else Geography()
         self.write = self.redis.register_script((ROOT / "redis/write_news.lua").read_text())
 

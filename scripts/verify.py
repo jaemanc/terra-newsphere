@@ -20,6 +20,8 @@ def main():
     parser.add_argument("--containers", action="store_true", help="Also build/start the full Kafka/Spark pipeline")
     parser.add_argument("--services-only", action="store_true", help="Resume service checks after syntax/build/config already passed")
     args = parser.parse_args()
+    if args.containers:
+        subprocess.run([sys.executable, "scripts/security_setup.py"], cwd=ROOT, check=True)
     env = {**os.environ, "PYTHONPATH": f"{ROOT / 'backend'}:{ROOT}"}
     process = None
     temporary = None
@@ -57,7 +59,7 @@ def main():
                     stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
             else:
                 subprocess.run(["docker", "run", "-d", "--rm", "--name", "terra-verify-redis",
-                    "-p", f"127.0.0.1:{port}:6379", "redis:7.4.5-alpine", "redis-server", "--save", "", "--appendonly", "no"], check=True)
+                    "-p", f"127.0.0.1:{port}:6379", "redis:7.4.11-alpine", "redis-server", "--save", "", "--appendonly", "no"], check=True)
                 docker_redis = True
             from redis import Redis
             database = Redis.from_url(env["TEST_REDIS_URL"])
@@ -84,6 +86,7 @@ def main():
                             "collector", "python", "/app/scripts/seed_demo.py", "--kafka"], cwd=ROOT, check=True)
             subprocess.run([sys.executable, "scripts/check_pipeline.py"], cwd=ROOT,
                            env={**env, "DEMO_RUN_ID": run_id}, check=True)
+            subprocess.run([sys.executable, "scripts/check_security.py"], cwd=ROOT, check=True)
         print("Service checks: PASSED" if args.services_only else "Combined validation cycle: PASSED", flush=True)
     finally:
         if process:

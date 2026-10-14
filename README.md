@@ -36,11 +36,12 @@ export COMPOSE_FILE=compose.yaml:deploy/compose.local-ca.yaml
 ### 2. 화면·API와 데모 기사 실행
 
 ```sh
-docker compose up --build -d --wait redis api frontend
-docker compose exec api python /app/scripts/seed_demo.py
+python3 scripts/security_setup.py
+docker compose up --build -d --wait
+docker compose run --rm --no-deps collector python /app/scripts/seed_demo.py --kafka
 ```
 
-브라우저에서 **http://localhost:8080**에 접속한다. 먼저 Redis·API·프런트만 시작해 지구와 카드 동작을 확인한다. 데모는 가상 기사로 표시하며 원문 링크는 `example.com`이다. 실제 보도나 생성된 번역으로 표현하지 않는다.
+브라우저에서 **http://localhost:8080**에 접속한다. 서비스별 인증과 격리를 적용한 전체 파이프라인으로 지구와 카드 동작을 확인한다. API 계정은 읽기 전용이므로 직접 데모를 적재하지 않고 Kafka/Spark 경로를 사용한다. 데모는 가상 기사로 표시하며 원문 링크는 `example.com`이다. 실제 보도나 생성된 번역으로 표현하지 않는다.
 
 ### 3. Kafka·Spark 수집 파이프라인 실행
 
@@ -128,3 +129,7 @@ docs/                    데이터 계약, 지리, 운영, 재개 기록
 배포는 [운영 문서](docs/operations.md), 저장 규칙은 [데이터 계약](docs/data-contract.md), 경계 출처·가공은 [지리 데이터](docs/geography.md)를 참고한다.
 
 중단 후에는 **“AGENTS.md와 docs/implementation-progress.md를 읽고 첫 미완료 단계부터 이어서 해줘”**라고 요청한다. 현재 준비 단계는 `.runtime/setup-stage.txt`에 기록된다.
+
+## 공개 배포 보안
+
+Redis 서비스별 ACL/secret, nginx 반복 호출 제한과 429, K3s HTTPS 및 내부 네트워크 격리, 도메인/인증서와 DDoS 보호는 [보안 문서](docs/security.md)를 참조한다. 민감한 값은 Git에서 제외되는 `.env`에서 관리한다. `.env.example`에는 값 없는 설정만 있으며, `python3 scripts/security_setup.py`가 기존 비밀번호를 유지해 `.env`와 컨테이너 secret 파일을 준비한다. Compose를 실행하기 전에 이 명령을 실행한다.

@@ -8,7 +8,7 @@ import urllib.request
 from terra_newsphere.models import article_id
 
 suffix = f"/{os.environ['DEMO_RUN_ID']}" if os.environ.get("DEMO_RUN_ID") else ""
-mapping = subprocess.check_output(["docker", "compose", "port", "frontend", "80"], text=True).strip().splitlines()[0]
+mapping = subprocess.check_output(["docker", "compose", "port", "frontend", "8080"], text=True).strip().splitlines()[0]
 port = mapping.rsplit(":", 1)[1]
 news_id = article_id(f"https://example.com/terra-demo/KR{suffix}")
 url = f"http://127.0.0.1:{port}/api/news/{news_id}"

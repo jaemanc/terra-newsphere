@@ -3,6 +3,7 @@ set -eu
 export UV_CACHE_DIR="$PWD/.cache/uv"
 export UV_PYTHON_INSTALL_DIR="$PWD/.cache/python"
 mkdir -p .runtime
+python3 scripts/security_setup.py
 set --
 if [ "${TERRA_SKIP_TLS_VERIFY:-0}" = "1" ]; then
   set -- --allow-insecure-host pypi.org --allow-insecure-host files.pythonhosted.org \

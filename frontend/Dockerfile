@@ -9,7 +9,11 @@ ARG VITE_CESIUM_ION_TOKEN=""
 ARG VITE_OSM_TILE_URL="https://tile.openstreetmap.org/"
 RUN npm run build
 
-FROM nginx:1.28.0-alpine
-COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
+FROM nginx:1.30.5-alpine
+COPY frontend/nginx-main.conf /etc/nginx/nginx.conf
+COPY frontend/nginx.conf /etc/nginx/terra-template.conf
+COPY frontend/start.sh /app/frontend-start.sh
 COPY --from=build /app/dist /usr/share/nginx/html
-EXPOSE 80
+USER 101:101
+ENTRYPOINT ["sh", "/app/frontend-start.sh"]
+EXPOSE 8080

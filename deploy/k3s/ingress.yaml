@@ -1,18 +1,23 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
-metadata: {name: terra-newsphere}
+metadata:
+  name: terra-newsphere
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: terra-newsphere-https-only@kubernetescrd,terra-newsphere-secure-headers@kubernetescrd
 spec:
   ingressClassName: traefik
   tls:
-    - hosts: [news.example.com]
-      secretName: terra-tls
+  - hosts:
+    - news.example.com
+    secretName: terra-tls
   rules:
-    - host: news.example.com
-      http:
-        paths:
-          - path: /api
-            pathType: Prefix
-            backend: {service: {name: api, port: {number: 8000}}}
-          - path: /
-            pathType: Prefix
-            backend: {service: {name: frontend, port: {number: 80}}}
+  - host: news.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: frontend
+            port:
+              number: 80
