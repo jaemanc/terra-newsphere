@@ -27,7 +27,7 @@ export function decorateLayer(layer, level, globe, locale, selection) {
     entity.polygon.material = new Cesium.ColorMaterialProperty(new Cesium.CallbackProperty(() => {
       if (hasDetailImagery(globe)) return selection.current[level] === props.region_id
         ? active.withAlpha(0.12) : base.withAlpha(0.015);
-      if (level === 'country') return globe.camera.positionCartographic.height < 3000000 ? base : light;
+      if (level === 'country') return light;
       return selection.current[level] === props.region_id ? active : light;
     }, false));
     const hierarchy = entity.polygon.hierarchy.getValue();

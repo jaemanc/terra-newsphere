@@ -25,5 +25,5 @@ export function detailLayer() {
 }
 
 export function hasDetailImagery(globe) {
-  return globe.imageryLayers.length > 1 && globe.imageryLayers.get(1).show;
+  return globe.imageryLayers.length > 1 && globe.imageryLayers.get(1).show && globe.imageryLayers.get(1).alpha > 0.5;
 }
