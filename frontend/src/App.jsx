@@ -30,6 +30,7 @@ export default function App() {
   const [preview, setPreview] = useState(null);
   const [globeError, setGlobeError] = useState(false);
   const [imageryUnavailable, setImageryUnavailable] = useState(false);
+  const [imageryLoading, setImageryLoading] = useState(false);
   const [ready, setReady] = useState(false);
   const host = useRef(null);
   const viewer = useRef(null);
@@ -65,6 +66,7 @@ export default function App() {
     let removeMove;
     let removeReadyRender;
     let removeImageryError;
+    let removeImageryRender;
     let detail;
     let detailFailed = false;
     try {
@@ -92,15 +94,57 @@ export default function App() {
       globe.scene.globe.preloadAncestors = false;
       globe.scene.globe.preloadSiblings = false;
       detail = detailLayer();
+      detail.alpha = 0;
       globe.imageryLayers.add(detail);
+      let enabledAt = 0;
+      let waitingForTiles = false;
+      let previousFrame = performance.now();
+      let failedTiles = 0;
+      let lastTileFailure = 0;
+      // Start visible tiles while zooming, independently of the debounced news query.
+      // Keep NASA underneath until this view is ready, then fade rather than swap.
+      removeImageryRender = globe.scene.postUpdate.addEventListener(() => {
+        const now = performance.now();
+        const elapsed = Math.min(64, now - previousFrame);
+        previousFrame = now;
+        const height = globe.camera.positionCartographic.height;
+        const close = height < 3000000 && !detailFailed;
+        if (close && !detail.show) {
+          detail.show = true;
+          enabledAt = now;
+          waitingForTiles = true;
+          setImageryLoading(true);
+          globe.scene.requestRender();
+        }
+        if (waitingForTiles && now - enabledAt >= 150 && globe.scene.globe.tilesLoaded) {
+          waitingForTiles = false;
+          setImageryLoading(false);
+        }
+        const target = close && !waitingForTiles ? Cesium.Math.clamp((3000000 - height) / 700000, 0, 1) : 0;
+        const remaining = target - detail.alpha;
+        detail.alpha += Math.sign(remaining) * Math.min(Math.abs(remaining), elapsed / 400);
+        if (Math.abs(target - detail.alpha) > 0.001 || (waitingForTiles && now - enabledAt < 150)) globe.scene.requestRender();
+        if (!close && detail.alpha <= 0.001) {
+          detail.show = false;
+          if (waitingForTiles) { waitingForTiles = false; setImageryLoading(false); }
+        }
+      });
       const unavailable = () => {
         if (!alive || detailFailed) return;
         detailFailed = true; detail.show = false;
+        setImageryLoading(false);
         setImageryUnavailable(true); updateView();
       };
       detail.errorEvent.addEventListener(unavailable);
       const watchProvider = provider => {
-        if (alive) removeImageryError = provider.errorEvent.addEventListener(unavailable);
+        if (alive) removeImageryError = provider.errorEvent.addEventListener(error => {
+          if (error.timesRetried < 1) { error.retry = true; return; }
+          const now = performance.now();
+          failedTiles = now - lastTileFailure < 10000 ? failedTiles + 1 : 1;
+          lastTileFailure = now;
+          // A missing tile should not disable the entire map; a failed burst does.
+          if (failedTiles >= 3) unavailable();
+        });
       };
       if (detail.ready) watchProvider(detail.imageryProvider);
       else detail.readyEvent.addEventListener(watchProvider);
@@ -178,7 +222,6 @@ export default function App() {
             .map(Cesium.Math.toDegrees).map((value) => value.toFixed(4)).join(',') : null;
           if (globe.imageryLayers.length) {
             const detailed = globe.camera.positionCartographic.height < 3000000;
-            detail.show = detailed && !detailFailed;
             for (const entity of countryLayer.current?.entities.values || []) entity.polygon.fill = detailed;
             globe.scene.requestRender();
           }
@@ -203,6 +246,7 @@ export default function App() {
       alive = false; clearTimeout(timer); removeMove?.(); handler?.destroy();
       removeReadyRender?.();
       removeImageryError?.();
+      removeImageryRender?.();
       if (globe && !globe.isDestroyed()) globe.destroy();
       viewer.current = null;
     };
@@ -445,7 +489,7 @@ export default function App() {
               <a href={preview.source.url} target="_blank" rel="noopener noreferrer">{text.source} ↗</a></>}
           </div>
         </article>}
-        {view?.height < 3000000 && <div className="map-mode">{imageryUnavailable ? text.imageryFallback : satellite ? text.satelliteMap : text.detailMap}
+        {(view?.height < 3000000 || imageryLoading) && <div className="map-mode">{imageryUnavailable ? text.imageryFallback : imageryLoading ? text.imageryLoading : satellite ? text.satelliteMap : text.detailMap}
           {country && !manifest.current?.administrative[country] && <span>{text.countryOnly}</span>}
         </div>}
         <div className="globe-bottom"><span>{text.instruction}</span><span className="view-count">{shownItems.length} {text.stories}</span></div>
