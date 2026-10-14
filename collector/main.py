@@ -6,6 +6,7 @@ import signal
 import time
 import zipfile
 from datetime import datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -22,13 +23,44 @@ log = logging.getLogger("collector")
 running = True
 
 
+class GdeltRateLimited(ValueError):
+    """GDELT can return its throttle notice with HTTP 200 instead of 429."""
+
+    def __init__(self, response: httpx.Response):
+        super().__init__("GDELT DOC rate limited")
+        self.retry_after = 5
+        header = response.headers.get("Retry-After", "")
+        try:
+            self.retry_after = max(5, int(header))
+        except ValueError:
+            try:
+                deadline = parsedate_to_datetime(header)
+                if deadline.tzinfo is not None:
+                    self.retry_after = max(5, (deadline - datetime.now(timezone.utc)).total_seconds())
+            except (ValueError, TypeError, OverflowError):
+                pass
+
+
 def gdelt(client: httpx.Client, query: str) -> list[dict]:
     response = client.get("https://api.gdeltproject.org/api/v2/doc/doc", params={
         "query": query, "mode": "artlist", "format": "json", "maxrecords": 100,
         "timespan": "1h", "sort": "datedesc"})
+    if response.status_code == 429:
+        raise GdeltRateLimited(response)
     response.raise_for_status()
+    try:
+        payload = response.json()
+    except ValueError:
+        if response.text.strip().lower().startswith("please limit requests to one every"):
+            raise GdeltRateLimited(response) from None
+        raise ValueError("GDELT DOC returned a non-JSON response") from None
+    if not isinstance(payload, dict) or not isinstance(payload.get("articles"), list):
+        notice = (payload.get("message") or payload.get("error")) if isinstance(payload, dict) else None
+        if isinstance(notice, str) and notice.strip().lower().startswith("please limit requests to one every"):
+            raise GdeltRateLimited(response)
+        raise ValueError("GDELT DOC returned an invalid article response")
     events = []
-    for item in response.json().get("articles", []):
+    for item in payload["articles"]:
         try:
             discovered = datetime.strptime(item["seendate"], "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc)
             events.append({"source": {"provider": "GDELT", "publisher": item.get("domain") or
@@ -87,6 +119,8 @@ def main():
     policy_file = Path(os.environ.get("RSS_POLICY_FILE", "collector/rss-policy.json"))
     policies = json.loads(policy_file.read_text()) if policy_file.exists() else {}
     interval = max(60, int(os.environ.get("COLLECT_INTERVAL_SECONDS", "900")))
+    next_gdelt_request = 0
+    gdelt_backoff = 0
     geography = Geography()
     try:
         with httpx.Client(timeout=30, follow_redirects=True, headers={
@@ -95,9 +129,14 @@ def main():
                 sources = [("GDELT", None)] + [(url, policies.get(url, {})) for url in
                            os.environ.get("RSS_URLS", "").split(",") if url.strip()]
                 for source, policy in sources:
+                    if policy is None and time.monotonic() < next_gdelt_request:
+                        continue
                     try:
                         events = gdelt(client, os.environ.get("GDELT_QUERY", "(climate OR earthquake OR economy OR technology)")) if policy is None else rss(client, source.strip(), policy)
                         if policy is None:
+                            gdelt_backoff = 0
+                            next_gdelt_request = time.monotonic() + interval
+                        if policy is None and events:
                             try:
                                 enrich_locations(client, events, geography)
                             except (httpx.HTTPError, ValueError, zipfile.BadZipFile):
@@ -117,6 +156,11 @@ def main():
                             event.update(schema_version=1, collected_at=first)
                             producer.send(os.environ.get("KAFKA_TOPIC", "news.raw"), key=news_id, value=event).get(timeout=30)
                         log.info("Published %d candidates from %s", len(events), "GDELT" if policy is None else "RSS")
+                    except GdeltRateLimited as error:
+                        gdelt_backoff = min(max(interval, gdelt_backoff * 2), max(interval, 3600))
+                        delay = max(gdelt_backoff, error.retry_after)
+                        next_gdelt_request = time.monotonic() + delay
+                        log.warning("GDELT DOC rate limited (HTTP 429 or throttle body); retry in at least %.0fs", delay)
                     except (httpx.HTTPError, ValueError, KeyError) as error:
                         log.warning("Source unavailable: %s", type(error).__name__)
                     # Redis/Kafka failure stops the process so the supervisor can restart it.

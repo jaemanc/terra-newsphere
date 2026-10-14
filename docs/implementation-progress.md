@@ -140,3 +140,9 @@ Hobby의 2 vCPU / 8GB / 32GB는 빌드 자원이다. 프런트만 Vercel에 두�
 - 프런트 이미지 빌드·Compose 설정 검사가 통과했다. 최초 연결 검사는 `ImageryLayerCollection.add()`가 반환값이 없는 것을 수정했다. 확대 검사는 실제 OSM 응답 200을 확인했지만 화면 중앙 줌에서 Cesium 1.131의 zero-axis 정규화 오류로 렌더링이 중단됐다. Unminified 엔진 스택이 `handleZoom → Camera.rotate → Quaternion.fromAxisAngle`인 것을 확인하고, 해당 카메라의 길이 0 회전만 no-op 처리했다. 수정 프런트 ARM64 이미지와 Docker 컨테이너 교체를 완료했다. Docker localhost:8080에서 실제 OSM level 13 타일 응답 200, 중앙 휠 확대, ADM2 계층, 출처 표시, 모바일, 외부 타일 중단 시 로컬 fallback이 통과했고 console/page/렌더 오류는 없었다. 같은 구성의 Unminified 개발 화면에서도 재현 검사가 통과했다. 뉴스/저장 구성은 바뀌지 않아 기존 파이프라인 검증을 반복하지 않는다. 필수 CI 통과 후 dev에 병합한다.
 
 - 마지막 화면 확인에서 비동기 경계 생성 완료 전에 렌더 요청이 끝나는 경우를 확인했다. 데이터 소스가 준비 중이거나 ready로 전환하는 프레임에만 렌더를 요청하고, 경계선은 ground-clamped polyline과 고정 색상으로 표시한다. 준비 후 idle 렌더 모드는 유지한다. 영향받은 프런트 이미지와 확대/모바일/fallback 검사는 다시 통과했다.
+
+## 2026-10-14 GDELT 호출 제한 처리
+- 사용자 제보와 기존 수집기 로그를 확인했다. DOC 호출은 기본 약 15분 간격이고 HTTP 429가 반복됐다. HTTP 200이라고 본문이 정상 JSON이라는 보장은 없으며, 단일 컨테이너가 5초 미만으로 DOC를 반복 호출했다는 증거는 없다.
+- `feature/gdelt-backoff`에서 HTTP 200 제한 안내와 HTTP 429를 명시적으로 분류한다. 기본 간격의 지수 대기(900→1800→3600초), 숫자/HTTP-date Retry-After 존중, 성공 후 대기 초기화와 GDELT만 건너뛰는 처리를 추가했다. RSS 주기는 유지하며 빈 DOC 결과에서는 GKG 네트워크 요청을 생략한다.
+- 응답 분류·최소 간격·지수 대기·정상화·RSS 유지·긴 Retry-After를 모의 HTTP/시계로 확인한다. 추가 실제 API 시험 호출은 하지 않는다. 수정 수집기 이미지와 dev 통합 검증을 진행한다.
+- 영향받은 격리 Redis/API/수집/지리 검사 5개가 모두 통과했다. 일반 Dockerfile의 수집기 linux/arm64 빌드와 컨테이너 교체도 성공했다. 새 컨테이너의 첫 DOC 요청은 여전히 HTTP 429였고 `retry in at least 900s`를 기록해 오류를 정상적으로 대기 처리했다. 제공자 제한이 해제됐거나 실제 기사 수집이 성공했다고 주장하지 않는다.
