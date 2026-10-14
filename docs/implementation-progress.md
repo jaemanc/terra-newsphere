@@ -141,6 +141,20 @@ Hobby의 2 vCPU / 8GB / 32GB는 빌드 자원이다. 프런트만 Vercel에 두�
 
 - 마지막 화면 확인에서 비동기 경계 생성 완료 전에 렌더 요청이 끝나는 경우를 확인했다. 데이터 소스가 준비 중이거나 ready로 전환하는 프레임에만 렌더를 요청하고, 경계선은 ground-clamped polyline과 고정 색상으로 표시한다. 준비 후 idle 렌더 모드는 유지한다. 영향받은 프런트 이미지와 확대/모바일/fallback 검사는 다시 통과했다.
 
+## 2026-10-13 NASA Blue Marble Base Map 표면 교체
+- 앞선 온라인 지도 PR #7은 ARM64 CI 38363229552 통과 후 dev merge commit `0aca1a6`으로 병합했다.
+- 사용자가 NASA Blue Marble Base Map을 지정하고 구름층 제외를 요청했다. `feature/nasa-blue-marble`에서 NASA 공식 Base Map의 2004년 7월 21600×10800(2km/pixel) JPEG와 출처를 확인했다.
+- 기존 전 지구 Natural Earth II level 0–2 표면을 NASA Base Map 로컬 geographic XYZ level 0–4로 교체했다. 최고 단계는 원본을 그대로 분할하고 아래 단계만 축소한다. 675px 타일 682개, 총 33,441,965바이트다.
+- 원본과 가공 타일 SHA256, 생성 방법과 Pillow 12.0.0 버전을 기록했다. 원본은 .cache에만 두고, Pillow는 별도의 오프라인 생성 명령에서만 사용한다. 런타임 뉴스 저장 구조·위치 좌표·행정구역 ID·상세 지도 전환은 유지한다.
+- 타일 생성과 프런트 이미지 빌드를 진행했다. 실제 Docker의 전 지구·대륙 확대·한국 상세 지도 전환과 구름층 없는 표면/출처 표시를 확인 중이다.
+
+## 2026-10-14 NASA 표면 검증 재개
+- 기존 타일 682개를 재사용하고 전체 타일 grid와 SHA256이 모두 일치하는 것을 확인했다. 재다운로드·재가공을 하지 않았다.
+- Docker Hub node/nginx 메타데이터 요청이 두 차례 TLS handshake timeout으로 실패했다. 기존 정상 서비스는 계속 실행 중이며 새 NASA 프런트 이미지로 교체됐다는 주장은 하지 않았다.
+- 로컬 검증은 설치된 고정 프런트 의존성으로 빌드하고 기존 검증된 linux/arm64 nginx 프런트 이미지에 새 정적 결과를 넣는 임시 빌드로 이어간다. 기본 Dockerfile은 유지하고 GitHub ARM64 CI에서 정상 전체 빌드를 확인한다.
+- 고정 의존성의 호스트 프런트 빌드와 기존 linux/arm64 nginx 이미지 기반 정적 결과 교체가 성공했다. Docker localhost:8080의 Chrome 검사에서 NASA level 0–4 응답 200, 이전 표면 요청 없음, 국가 경계, 대륙 확대, 한국 OSM 상세 전환, NASA 출처와 모바일을 확인했다. console/page/렌더 오류는 0개다. 실제 일반 Dockerfile 빌드는 필수 GitHub ARM64 CI에서 확인한다.
+- PR #8의 GitHub ARM64 CI 38494381788(Branch policy/Validate)이 성공해 일반 Dockerfile 전체 이미지 빌드와 Kafka→Spark→Redis→API 검증을 확인했다. dev에 merge commit `d973202`로 병합했다. Git HTTPS의 HTTP/2 전송 오류는 이번 push에만 HTTP/1.1을 적용해 해결했다.
+
 ## 2026-10-14 GDELT 호출 제한 처리
 - 사용자 제보와 기존 수집기 로그를 확인했다. DOC 호출은 기본 약 15분 간격이고 HTTP 429가 반복됐다. HTTP 200이라고 본문이 정상 JSON이라는 보장은 없으며, 단일 컨테이너가 5초 미만으로 DOC를 반복 호출했다는 증거는 없다.
 - `feature/gdelt-backoff`에서 HTTP 200 제한 안내와 HTTP 429를 명시적으로 분류한다. 기본 간격의 지수 대기(900→1800→3600초), 숫자/HTTP-date Retry-After 존중, 성공 후 대기 초기화와 GDELT만 건너뛰는 처리를 추가했다. RSS 주기는 유지하며 빈 DOC 결과에서는 GKG 네트워크 요청을 생략한다.

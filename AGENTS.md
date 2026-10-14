@@ -113,7 +113,7 @@ frontend/public/geo/
 - When only a country is known, place its marker at the country's **capital** (as a presentation fallback, not a claim that the event happened there).
 - Do not fabricate coordinates or region IDs for ambiguous locations. Record uncertainty and avoid presenting inferred locations as exact.
 
-By explicit user request on 2026-10-13, background imagery may stream online OpenStreetMap tiles or Cesium ion imagery using a user-provided token. This exception applies only to the background map: administrative boundaries and geographic IDs remain bundled and versioned. Keep attribution visible, follow tile policies, avoid bulk downloads, and retain the local boundary fallback.
+By explicit user request on 2026-10-13, background imagery may stream online OpenStreetMap tiles or Cesium ion imagery using a user-provided token. The global overview uses bundled NASA Blue Marble: Next Generation – Base Map (July 2004) surface tiles; do not add a cloud overlay. This exception applies only to the background map: administrative boundaries and geographic IDs remain bundled and versioned. Keep attribution visible, follow tile policies, avoid bulk downloads, and retain the local boundary fallback.
 
 ## 7. Redis-Only News Storage and 7-Day Retention
 
