@@ -1,0 +1,23 @@
+# Actual news collection
+
+The collector starts its first collection immediately, before the recurring interval. It fetches each configured RSS feed (up to 100 available entries per feed), publishes entries from the last seven days, then performs the initial GDELT DOC lookup over `7d` with `maxrecords=250`. This is a bounded bootstrap of available recent coverage, not a complete global archive. If DOC is throttled, its initial lookup remains pending until a successful response; RSS continues. Later DOC requests use `1h`/100 and the normal interval.
+
+Every initial and recurring event follows collector → `news.raw` → single local Spark application → validated Redis record and region indexes. No separate bootstrap datastore or direct unvalidated Redis seed is used. Redis may take several Spark microbatches to fill. The empty frontend refreshes every five seconds, then every minute after data arrives. Recollection preserves the first collection time and the original seven-day expiry.
+
+`collector:gdelt:cooldown` is an expiring Redis request gate. It prevents DOC retries within five seconds across collector restarts and preserves the provider cooldown/backoff. It contains only the backoff value and has a TTL equal to the current request window, independently of article retention.
+
+## Local supplementary RSS feeds
+
+Local Compose and `.env.example` configure 11 official BBC News feeds: world, Asia, Europe, US/Canada, Africa, Middle East, Latin America, business, technology, science/environment and UK. `RSS_URLS` can override the set; an explicitly empty value disables RSS. Kubernetes has no BBC default; choose licensed sources for its intended use.
+
+Checked 2026-10-14 against the live [BBC terms](https://www.bbc.com/pages/terms-of-use), section **Metadata and RSS feeds**, and the feed's own copyright/terms link. BBC permits individuals to display its News RSS feed with unchanged supplied material and a prominent BBC News credit/link. Business use requires permission/licensing. These are personal local development defaults, not a grant for commercial redistribution. Keep the supplied headline, short description and original media thumbnail URL; do not scrape article bodies or increase thumbnail resolution. The visible card includes the original article link labelled BBC News. The source check and allowed thumbnail host `ichef.bbci.co.uk` are recorded in `collector/rss-policy.json`.
+
+Other feeds need explicit policies before displaying their descriptions or thumbnails. Source-provided HTML descriptions are converted to plain text; scripts/styles are ignored. No generated summary, translation or image is substituted. Missing thumbnails use the existing neutral fallback. GDELT's `socialimage` remains excluded because discovery does not license it.
+
+## Place associations and presentation
+
+An exact, unambiguous country name in a supplied headline/description can create a **mentioned** association with confidence 0.5. Codes are checked against the versioned geography dataset. Ambiguous names such as Jordan (person/country), Georgia (state/country), Chad and Turkey are excluded from automatic name matching. Generic Korea is not mapped to either Korea. Short abbreviations US/UK/UAE require uppercase. Publisher nationality and feed section are never used as event locations. Existing GKG metadata may add country mentions without discarding existing references.
+
+These are not precise event locations. Country-only news uses the validated capital presentation fallback and displays the uncertainty in its preview. Do not manufacture administrative IDs or exact city coordinates. Articles with no confirmed association remain visible in the global list as **Location unconfirmed**, with an unanchored preview and no globe marker. Region-filtered lists continue to use actual validated region indexes.
+
+The UI requests `include_demo=false` so fixtures never inflate real news counts. API defaults remain backward compatible for pipeline verification; demo records are always explicitly flagged. Marker responses include source URL and a provided short summary. Initial lists are bounded to 200 per response, with pagination and the existing 500-item browser cap.

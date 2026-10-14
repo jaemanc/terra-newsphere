@@ -17,6 +17,7 @@ export const messages = {
     reportedLocation: 'Reported location', vectorMap: 'Detailed boundary map', countryOnly: 'Only country boundaries are bundled here',
     detailMap: 'Detailed map', satelliteMap: 'Satellite map', imageryFallback: 'Background unavailable · local boundary map',
     imageryLoading: 'Loading detailed map…',
+    unlocated: 'Location unconfirmed',
   },
   ko: {
     eyebrow: '지금, 세계의 이야기', tagline: '모든 이야기에는 장소가 있습니다.', subtitle: '지구를 돌려 최근 7일의 뉴스를 만나보세요.',
@@ -36,6 +37,7 @@ export const messages = {
     reportedLocation: '보도 지역', vectorMap: '상세 경계 지도', countryOnly: '이 국가는 국가 경계만 제공됩니다',
     detailMap: '상세 지도', satelliteMap: '위성 지도', imageryFallback: '배경 지도 연결 실패 · 기본 경계 지도',
     imageryLoading: '상세 지도 연결 중…',
+    unlocated: '위치 미확인',
   },
 };
 

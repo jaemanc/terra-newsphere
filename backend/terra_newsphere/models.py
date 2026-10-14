@@ -5,7 +5,7 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
 RETENTION_SECONDS = 604800
-TRACKING_PARAMS = {"fbclid", "gclid", "mc_cid", "mc_eid"}
+TRACKING_PARAMS = {"fbclid", "gclid", "mc_cid", "mc_eid", "at_medium", "at_campaign"}
 
 
 def canonical_url(value: str) -> str:

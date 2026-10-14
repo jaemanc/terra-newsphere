@@ -59,4 +59,7 @@ def enrich_locations(client, events, geography):
                             reference = {"country_code": code, "role": "mentioned", "confidence": .5}
                             if code and reference not in references:
                                 references.append(reference)
-                        event["location_references"] = references[:20]
+                        for reference in references:
+                            if reference not in event["location_references"]:
+                                event["location_references"].append(reference)
+                        event["location_references"] = event["location_references"][:20]
