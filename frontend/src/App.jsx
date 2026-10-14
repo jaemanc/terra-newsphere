@@ -4,6 +4,7 @@ import { initialLocale, messages } from './i18n.js';
 import { countryName, regionName, locationName, locationsName } from './geo.js';
 import { decorateLayer, MARKER_HEIGHT } from './map-layers.js';
 import { overviewLayer, detailLayer, satellite } from './imagery.js';
+import { shortHeadline, latestNewsEntity } from './news-labels.js';
 
 const FALLBACK = '/images/fallback.svg';
 
@@ -65,6 +66,7 @@ export default function App() {
     let handler;
     let timer;
     let removeMove;
+    let newsResize;
     let removeReadyRender;
     let removeImageryError;
     let removeImageryRender;
@@ -157,22 +159,37 @@ export default function App() {
       globe.camera.setView({ destination: Cesium.Cartesian3.fromDegrees(55, 20, 22000000) });
       const news = new Cesium.CustomDataSource('news');
       news.clustering.enabled = true;
-      news.clustering.pixelRange = 48;
-      news.clustering.minimumClusterSize = 3;
+      news.clustering.pixelRange = 64;
+      news.clustering.minimumClusterSize = 2;
       news.clustering.clusterEvent.addEventListener((entities, cluster) => {
+        const representative = latestNewsEntity(entities);
+        if (!representative) return;
         cluster.label.show = true;
-        cluster.label.text = String(entities.length);
-        cluster.label.font = 'bold 14px sans-serif';
+        cluster.label.text = shortHeadline(representative.news.translations?.[mapLocale.current]?.title || representative.news.title,
+          globe.canvas.clientWidth < 600 ? 18 : 26);
+        cluster.label.id = representative;
+        cluster.label.font = '600 12px sans-serif';
         cluster.label.fillColor = Cesium.Color.WHITE;
-        cluster.label.showBackground = true;
-        cluster.label.backgroundColor = Cesium.Color.fromCssColorString('#23574f');
+        cluster.label.outlineColor = Cesium.Color.fromCssColorString('#17120d');
+        cluster.label.outlineWidth = 3;
+        cluster.label.style = Cesium.LabelStyle.FILL_AND_OUTLINE;
+        cluster.label.showBackground = false;
+        cluster.label.horizontalOrigin = Cesium.HorizontalOrigin.CENTER;
+        cluster.label.pixelOffset = new Cesium.Cartesian2(0, -20);
         cluster.billboard.show = false;
         cluster.point.show = true;
-        cluster.point.pixelSize = 32;
-        cluster.point.color = Cesium.Color.fromCssColorString('#2a8173');
-        cluster.point.outlineColor = Cesium.Color.fromCssColorString('#8ce4d2');
-        cluster.point.outlineWidth = 1;
+        cluster.point.id = representative;
+        cluster.point.pixelSize = 22;
+        cluster.point.color = Cesium.Color.fromCssColorString('#ff932e');
+        cluster.point.outlineColor = Cesium.Color.fromCssColorString('#fff4df');
+        cluster.point.outlineWidth = 2;
+        globe.scene.requestRender();
       });
+      newsResize = new ResizeObserver(() => {
+        news.clustering.pixelRange = globe.canvas.clientWidth < 600 ? 80 : 64;
+        globe.scene.requestRender();
+      });
+      newsResize.observe(host.current);
       markers.current = news;
       globe.dataSources.add(news);
       Promise.all([
@@ -245,7 +262,7 @@ export default function App() {
       setGlobeError('webgl');
     }
     return () => {
-      alive = false; clearTimeout(timer); removeMove?.(); handler?.destroy();
+      alive = false; clearTimeout(timer); removeMove?.(); newsResize?.disconnect(); handler?.destroy();
       removeReadyRender?.();
       removeImageryError?.();
       removeImageryRender?.();
@@ -312,9 +329,18 @@ export default function App() {
     if (adm2) params.set('adm2', adm2);
     if (view?.bbox) params.set('bbox', view.bbox);
     try {
-      const response = await fetch(`/api/news/markers?${params}`, { signal: controller.signal, cache: 'no-store' });
-      if (!response.ok) throw new Error();
-      const data = await response.json();
+      const data = { items: [], next_cursor: nextCursor };
+      let pages = 0;
+      do {
+        params.set('cursor', String(data.next_cursor));
+        params.set('limit', String(append ? 200 : Math.min(200, 500 - data.items.length)));
+        const response = await fetch(`/api/news/markers?${params}`, { signal: controller.signal, cache: 'no-store' });
+        if (!response.ok) throw new Error();
+        const page = await response.json();
+        pages += 1;
+        data.items.push(...page.items);
+        data.next_cursor = page.next_cursor;
+      } while (!append && pages < 3 && data.next_cursor !== null && data.items.length < 500);
       if (current !== generation.current) return;
       setItems((previous) => {
         const combined = append ? [...previous, ...data.items] : data.items;
@@ -357,15 +383,32 @@ export default function App() {
       item.locations.forEach((location, index) => {
         const entity = markers.current.entities.add({ id: `${item.news_id}:${index}`,
           position: Cesium.Cartesian3.fromDegrees(location.longitude, location.latitude, MARKER_HEIGHT),
-          point: { pixelSize: 9, color: Cesium.Color.fromCssColorString(item.is_demo ? '#e9c580' : '#8ce4d2'),
-            outlineColor: Cesium.Color.fromCssColorString('#143e3c'), outlineWidth: 2,
+          point: { pixelSize: 12, color: Cesium.Color.fromCssColorString('#ff932e'),
+            outlineColor: Cesium.Color.fromCssColorString('#fff4df'), outlineWidth: 2,
             heightReference: Cesium.HeightReference.NONE },
+          label: {
+            text: new Cesium.CallbackProperty(() => shortHeadline(item.translations?.[mapLocale.current]?.title || item.title,
+              viewer.current.canvas.clientWidth < 600 ? 18 : 26), false),
+            font: '600 12px sans-serif', fillColor: Cesium.Color.WHITE,
+            outlineColor: Cesium.Color.fromCssColorString('#17120d'), outlineWidth: 3,
+            style: Cesium.LabelStyle.FILL_AND_OUTLINE, showBackground: false,
+            horizontalOrigin: Cesium.HorizontalOrigin.CENTER, pixelOffset: new Cesium.Cartesian2(0, -20),
+          },
         });
         entity.news = item; entity.newsLocation = location;
       });
     }
-    viewer.current?.scene.requestRender();
-  }, [items, ready]);
+    // Label glyph atlases become ready after the data source's sticky ready flag.
+    // Render a few frames on news changes, then return to the idle render mode.
+    let frames = 0;
+    let frame;
+    const renderLabels = () => {
+      viewer.current?.scene.requestRender();
+      if (++frames < 4) frame = requestAnimationFrame(renderLabels);
+    };
+    renderLabels();
+    return () => cancelAnimationFrame(frame);
+  }, [items, ready, locale]);
 
   useEffect(() => {
     setPreview(null);
