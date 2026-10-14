@@ -16,7 +16,8 @@ async def lifespan(app: FastAPI):
     app.state.store.redis.close()
 
 
-app = FastAPI(title="TerraNewsphere", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="TerraNewsphere", version="0.1.0", lifespan=lifespan,
+              docs_url=None, redoc_url=None, openapi_url=None)
 
 
 @app.exception_handler(RedisError)

@@ -30,7 +30,7 @@ kubectl -n terra-newsphere wait --for=condition=complete job/kafka-init --timeou
 kubectl -n terra-newsphere get pods
 ```
 
-K3s 기본 Traefik과 local-path StorageClass를 전제로 한다. ingress에는 HTTPS 설정을 두고, HTTP에서 HTTPS로의 리다이렉트는 Traefik entrypoint에서 설정한다. OCI 방화벽은 웹 80/443과 필요한 관리 접근만 열고 Kafka/Redis 포트는 열지 않는다. NetworkPolicy는 같은 namespace와 kube-system ingress 경유 웹 접근만 허용한다. 설치한 CNI가 NetworkPolicy를 실제 적용하는지도 확인한다.
+K3s 기본 Traefik과 local-path StorageClass를 전제로 한다. ingress에는 HTTPS 설정을 두고, HTTP에서 HTTPS로의 리다이렉트와 HSTS는 포함된 Traefik Middleware에서 설정한다. OCI 방화벽은 웹 80/443과 필요한 관리 접근만 열고 Kafka/Redis 포트는 열지 않는다. NetworkPolicy는 기본 ingress/egress를 거부하고 필요한 서비스 연결만 허용한다. 모든 웹/API는 Traefik→nginx를 거쳐 호출 제한을 적용한다. Redis ACL Secret과 TLS 준비는 [보안 문서](security.md)를 따른다. 설치한 CNI가 NetworkPolicy를 실제 적용하는지도 확인한다.
 
 RSS는 `collector/rss-policy.json`과 `RSS_URLS`에 운영자가 확인한 피드를 설정한다. 피드별 `event_locations`는 해당 피드가 특정 보도 지역을 보장할 때만 지정하고 출판사 위치로 대체하지 않는다. 썸네일은 `allow_thumbnails: true`로 사용 권한을 확인한 피드에만 허용한다. 현재 별도 유료 API 키는 필요 없다. 추가 키는 Kubernetes Secret/env로 전달한다.
 

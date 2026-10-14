@@ -14,12 +14,13 @@ from urllib.parse import urlsplit
 import feedparser
 import httpx
 from kafka import KafkaProducer
-from redis import Redis
 
 from terra_newsphere.models import RETENTION_SECONDS, article_id, canonical_url
 from terra_newsphere.geography import Geography
 from collector.gkg import enrich_locations
 from collector.feed_metadata import mentioned_locations, plain_text
+from terra_newsphere.connection import redis_client
+from collector.download import download
 
 log = logging.getLogger("collector")
 running = True
@@ -44,7 +45,7 @@ class GdeltRateLimited(ValueError):
 
 
 def gdelt(client: httpx.Client, query: str, *, timespan: str = "1h", maxrecords: int = 100) -> list[dict]:
-    response = client.get("https://api.gdeltproject.org/api/v2/doc/doc", params={
+    response = download(client, "https://api.gdeltproject.org/api/v2/doc/doc", params={
         "query": query, "mode": "artlist", "format": "json", "maxrecords": maxrecords,
         "timespan": timespan, "sort": "datedesc"})
     if response.status_code == 429:
@@ -81,11 +82,11 @@ def gdelt(client: httpx.Client, query: str, *, timespan: str = "1h", maxrecords:
 
 def rss(client: httpx.Client, feed_url: str, policy: dict, geography: Geography | None = None) -> list[dict]:
     try:
-        response = client.get(feed_url)
+        response = download(client, feed_url)
     except (httpx.ConnectError, httpx.ConnectTimeout, httpx.RemoteProtocolError):
         log.warning("RSS transport failed; retrying once after 1s")
         time.sleep(1)
-        response = client.get(feed_url)
+        response = download(client, feed_url)
     response.raise_for_status()
     feed = feedparser.parse(response.content)
     events = []
@@ -128,8 +129,7 @@ def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
-    database = Redis.from_url(os.environ.get("REDIS_URL", "redis://localhost:6379/0"),
-                              decode_responses=True, socket_timeout=5)
+    database = redis_client()
     producer = KafkaProducer(bootstrap_servers=os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092").split(","),
                              acks="all", retries=5, max_request_size=131072,
                              key_serializer=lambda key: key.encode(),

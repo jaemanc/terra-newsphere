@@ -3,6 +3,15 @@ revision = 3
 requires-python = ">=3.12, <3.14"
 
 [[package]]
+name = "annotated-doc"
+version = "0.0.5"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/5a/8e/38aa427ed5402449e226975b649c5dc73ccadfefeb95e6aecb8f8ea4b6b6/annotated_doc-0.0.5.tar.gz", hash = "sha256:c7e58ce09192557605d8bbd92836d7e1d520ac9580096042c0bfd197efacf1bb", size = 10758, upload-time = "2026-07-28T13:50:58.129Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/3e/30/e900b21425a860e195f32e37657aa1f7c7f2b1bfb26f03ca209b90933c06/annotated_doc-0.0.5-py3-none-any.whl", hash = "sha256:117bac03a25ede5df5440e855b32d556049ca169ead221505badf432fed4b101", size = 5302, upload-time = "2026-07-28T13:50:57.239Z" },
+]
+
+[[package]]
 name = "annotated-types"
 version = "0.8.0"
 source = { registry = "https://pypi.org/simple" }
@@ -44,16 +53,19 @@ wheels = [
 
 [[package]]
 name = "fastapi"
-version = "0.116.1"
+version = "0.143.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
+    { name = "annotated-doc" },
+    { name = "opentelemetry-api" },
     { name = "pydantic" },
     { name = "starlette" },
     { name = "typing-extensions" },
+    { name = "typing-inspection" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/78/d7/6c8b3bfe33eeffa208183ec037fee0cce9f7f024089ab1c5d12ef04bd27c/fastapi-0.116.1.tar.gz", hash = "sha256:ed52cbf946abfd70c5a0dccb24673f0670deeb517a88b3544d03c2a6bf283143", size = 296485, upload-time = "2025-07-11T16:22:32.057Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/0b/d7/6a8753ab6c1d432dc53703c3e1b92974a94531b7d047c32bbaae461ea844/fastapi-0.143.0.tar.gz", hash = "sha256:1acffe48206a80917cf7dac21992b5c44b25384e8902bf745c1fd9dabcf6c51f", size = 468391, upload-time = "2026-10-08T12:29:46.54Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e5/47/d63c60f59a59467fda0f93f46335c9d18526d7071f025cb5b89d5353ea42/fastapi-0.116.1-py3-none-any.whl", hash = "sha256:c46ac7c312df840f0c9e220f7964bada936781bc4e2e6eb71f1c4d7553786565", size = 95631, upload-time = "2025-07-11T16:22:30.485Z" },
+    { url = "https://files.pythonhosted.org/packages/bd/f4/27e386913417ad32aae42bba48b0c0cce40e9ff2fba1a871ca2702c37324/fastapi-0.143.0-py3-none-any.whl", hash = "sha256:3e9395fd35276425b61b516a31fdd7c77fe2af83e41b4da22e30696fb1304c5d", size = 144665, upload-time = "2026-10-08T12:29:44.853Z" },
 ]
 
 [[package]]
@@ -116,11 +128,11 @@ wheels = [
 
 [[package]]
 name = "kafka-python"
-version = "2.2.15"
+version = "2.3.2"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/da/67/1434436f3cb409443f72a4843b877ac2d9bf586a31a0e966cf1dc4dc9a94/kafka_python-2.2.15.tar.gz", hash = "sha256:e0f480a45f3814cb0eb705b8b4f61069e1be61dae0d8c69d0f1f2da33eea1bd5", size = 347870, upload-time = "2025-07-01T17:37:53.686Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c6/7e/9eb4363e5018b71edf77de3d2fbd687f1e3a55d43101138a5b7f2ca56d97/kafka_python-2.3.2.tar.gz", hash = "sha256:2d2469bcabc2551be7eaf7fb512e1241484d358800f2665b90e7e24fea84259d", size = 357589, upload-time = "2026-06-03T22:46:49.022Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e6/35/e8bfed5425e8fe685bd03ec3f5135ee8b88c11558baa59c0d12fbd2a20ae/kafka_python-2.2.15-py2.py3-none-any.whl", hash = "sha256:84c0993cd4f7f2f01e92d8104ea9bdf631aff72fc5e6ea62eb3bdf1d56528fc3", size = 309751, upload-time = "2025-07-01T17:37:51.87Z" },
+    { url = "https://files.pythonhosted.org/packages/4f/db/cfe23cfacc9aabeef59e349aa6c2738d195df1d56ccf8c31362abdd68ddb/kafka_python-2.3.2-py2.py3-none-any.whl", hash = "sha256:e8a5e6f2c4ce13a8041669337038d5125e0e09e6d6f0911902ae5939e5b9595e", size = 326623, upload-time = "2026-06-03T22:46:47.417Z" },
 ]
 
 [[package]]
@@ -151,6 +163,18 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/e9/98/d27552990f1bd611ef3e7466adadc78312ea2df63b83aad47fdc3d3ca8df/numpy-2.5.4-cp313-cp313-win32.whl", hash = "sha256:5258bc06526964be5face2fc6f756857a3f24f21ec3e72ca131337a75b165d6c", size = 6134537, upload-time = "2026-10-10T20:03:30.511Z" },
     { url = "https://files.pythonhosted.org/packages/90/8c/140a40398a66b4471211be1affdb6ed24c486d581bd28d07b7f2fcb69540/numpy-2.5.4-cp313-cp313-win_amd64.whl", hash = "sha256:8b4d2fd2d34e5f8c9235ee787de5631a37a28402b15cb80814df973d2be54129", size = 12566113, upload-time = "2026-10-10T20:03:32.612Z" },
     { url = "https://files.pythonhosted.org/packages/34/52/01d205e5e8ccb27b2b0b141e801f22b830198c979111b0fa44771438d9a9/numpy-2.5.4-cp313-cp313-win_arm64.whl", hash = "sha256:bc39ac66a7a9a3fbd6134fda43136b60ffde99c8f4501e64e0d2b24da137babf", size = 10519523, upload-time = "2026-10-10T20:03:35.163Z" },
+]
+
+[[package]]
+name = "opentelemetry-api"
+version = "1.45.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/2e/02/6e0ae9cc61bd3169d401077b507b3ebc344745171e1051ab430be012dcd9/opentelemetry_api-1.45.1.tar.gz", hash = "sha256:aa38ed19bcc084ba42782a73255b3582283eced7ad6dddbd6695189e69adfb75", size = 72804, upload-time = "2026-10-06T17:32:58.133Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1e/41/f7dcf80b81ee8e71c1a2b59f14208bc723edbd89ed027a73b175abf6348e/opentelemetry_api-1.45.1-py3-none-any.whl", hash = "sha256:b31553efa588ae44bc306f863c785c5333a9ecc091248c6ee68b4b6c87fdedfb", size = 60256, upload-time = "2026-10-06T17:32:33.506Z" },
 ]
 
 [[package]]
@@ -315,15 +339,15 @@ wheels = [
 
 [[package]]
 name = "starlette"
-version = "0.47.3"
+version = "1.3.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
     { name = "typing-extensions", marker = "python_full_version < '3.13'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/15/b9/cc3017f9a9c9b6e27c5106cc10cc7904653c3eec0729793aec10479dd669/starlette-0.47.3.tar.gz", hash = "sha256:6bc94f839cc176c4858894f1f8908f0ab79dfec1a6b8402f6da9be26ebea52e9", size = 2584144, upload-time = "2025-08-24T13:36:42.122Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/eb/e3/7c1dc7381d9f8ab7d854328ebfa884e62cb3f3d8549ddfd37c7814f42afa/starlette-1.3.1.tar.gz", hash = "sha256:05d0213193f2fbaae60e2ecb593b4add4262ad4e46536b54abe36f11a71724e0", size = 2703240, upload-time = "2026-06-12T09:23:11.602Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ce/fd/901cfa59aaa5b30a99e16876f11abe38b59a1a2c51ffb3d7142bb6089069/starlette-0.47.3-py3-none-any.whl", hash = "sha256:89c0778ca62a76b826101e7c709e70680a1699ca7da6b44d38eb0a7e61fe4b51", size = 72991, upload-time = "2025-08-24T13:36:40.887Z" },
+    { url = "https://files.pythonhosted.org/packages/ec/bb/2799cc2ede3ed41131f8975621e7213dfc7ef4acbbaadfa440f32500c370/starlette-1.3.1-py3-none-any.whl", hash = "sha256:c7372aae11c3c3f26a42df7bd626cec2f47d03483d261d369516a615a53714c6", size = 73632, upload-time = "2026-06-12T09:23:10.017Z" },
 ]
 
 [[package]]
@@ -338,6 +362,7 @@ dependencies = [
 [package.optional-dependencies]
 api = [
     { name = "fastapi" },
+    { name = "starlette" },
     { name = "uvicorn" },
 ]
 collector = [
@@ -360,18 +385,19 @@ spark = [
 
 [package.metadata]
 requires-dist = [
-    { name = "fastapi", marker = "extra == 'api'", specifier = "==0.116.1" },
+    { name = "fastapi", marker = "extra == 'api'", specifier = "==0.143.0" },
     { name = "feedparser", marker = "extra == 'collector'", specifier = "==6.0.11" },
     { name = "httpx", marker = "extra == 'collector'", specifier = "==0.28.1" },
     { name = "httpx", marker = "extra == 'dev'", specifier = "==0.28.1" },
     { name = "httpx", marker = "extra == 'geo'", specifier = "==0.28.1" },
-    { name = "kafka-python", marker = "extra == 'collector'", specifier = "==2.2.15" },
+    { name = "kafka-python", marker = "extra == 'collector'", specifier = "==2.3.2" },
     { name = "pycountry", marker = "extra == 'geo'", specifier = "==24.6.1" },
     { name = "pydantic", specifier = "==2.11.7" },
     { name = "pyspark", marker = "extra == 'spark'", specifier = "==4.0.2" },
     { name = "pyyaml", marker = "extra == 'dev'", specifier = "==6.0.2" },
     { name = "redis", specifier = "==6.2.0" },
     { name = "shapely", marker = "extra == 'geo'", specifier = "==2.1.1" },
+    { name = "starlette", marker = "extra == 'api'", specifier = "==1.3.1" },
     { name = "uvicorn", marker = "extra == 'api'", specifier = "==0.35.0" },
 ]
 provides-extras = ["api", "collector", "spark", "geo", "dev"]

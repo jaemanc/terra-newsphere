@@ -69,7 +69,7 @@ class GdeltLimits(unittest.TestCase):
         with patch.dict(os.environ, {"COLLECT_INTERVAL_SECONDS": "1", "RSS_URLS": "https://example.com/rss"}), \
                 patch.object(collector, "running", True), \
                 patch.object(collector.signal, "signal"), \
-                patch.object(collector.Redis, "from_url", return_value=database), \
+                patch.object(collector, "redis_client", return_value=database), \
                 patch.object(collector, "KafkaProducer", return_value=Mock()), \
                 patch.object(collector, "Geography"), \
                 patch.object(collector, "gdelt", side_effect=discovery), \
