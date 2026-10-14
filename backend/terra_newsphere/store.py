@@ -58,7 +58,7 @@ class NewsStore:
         now = time.time()
         self.redis.zremrangebyscore(key, "-inf", now)
         # ponytail: cap each scan at 500 candidates; use Redis GEO if measured density needs it.
-        ids = self.redis.zrangebyscore(key, f"({now}", "+inf", start=cursor, num=500)
+        ids = self.redis.zrevrangebyscore(key, "+inf", f"({now}", start=cursor, num=500)
         pipe = self.redis.pipeline(transaction=False)
         for news_id in ids:
             pipe.get(f"news:article:{news_id}")

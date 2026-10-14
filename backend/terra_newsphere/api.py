@@ -71,7 +71,8 @@ def markers(request: Request,
                                         article.content.translations.items()},
                        "thumbnail_url": article.content.thumbnail_url,
                        "publisher": article.source.publisher, "locations": article.locations,
-                       "published_at": article.published_at, "expires_at": article.expires_at,
+                       "published_at": article.published_at, "collected_at": article.collected_at,
+                       "expires_at": article.expires_at,
                        "is_demo": article.is_demo} for article in articles],
             "next_cursor": next_cursor}
 

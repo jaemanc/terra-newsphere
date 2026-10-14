@@ -163,7 +163,7 @@ def main():
                         continue
                     try:
                         events = gdelt(client, os.environ.get("GDELT_QUERY", "(climate OR earthquake OR economy OR technology)"),
-                                       timespan="7d" if initial_doc else "1h", maxrecords=250 if initial_doc else 100) \
+                                       timespan="7d" if initial_doc else "1h", maxrecords=250) \
                             if policy is None else rss(client, source.strip(), policy, geography)
                         if policy is None:
                             initial_doc = False
