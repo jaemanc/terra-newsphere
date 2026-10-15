@@ -15,6 +15,7 @@ function Thumbnail({ url, className }) {
 
 export default function App() {
   const [locale, setLocale] = useState(initialLocale);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const text = messages[locale];
   const [country, setCountry] = useState('');
   const [adm1, setAdm1] = useState('');
@@ -162,8 +163,11 @@ export default function App() {
       globe.camera.setView({ destination: Cesium.Cartesian3.fromDegrees(55, 20, 22000000) });
       const news = createNewsLayer(globe, mapLocale);
       newsResize = new ResizeObserver(() => {
+        globe.resize();
         news.clustering.pixelRange = globe.canvas.clientWidth < 600 ? 80 : 64;
+        setHover(null);
         globe.scene.requestRender();
+        viewUpdate.current?.();
       });
       newsResize.observe(host.current);
       markers.current = news;
@@ -459,16 +463,27 @@ export default function App() {
     }
   }
 
-  return <main className="app">
+  return <main className={`app${sidebarOpen ? '' : ' sidebar-collapsed'}`}>
     <header className="topbar">
-      <a className="brand" href="/" aria-label="TerraNewsphere"><span className="brand-icon">◎</span> TERRA<span>NEWS</span>PHERE</a>
+      <div className="brand-group">
+        <button className="sidebar-toggle" aria-controls="news-sidebar" aria-expanded={sidebarOpen}
+          aria-label={sidebarOpen ? text.hideSidebar : text.showSidebar}
+          title={sidebarOpen ? text.hideSidebar : text.showSidebar}
+          onClick={() => setSidebarOpen((open) => !open)}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+            <rect x="3" y="4" width="18" height="16" rx="2" /><path d="M9 4v16" />
+            <path d={sidebarOpen ? 'm16 9-3 3 3 3' : 'm13 9 3 3-3 3'} />
+          </svg>
+        </button>
+        <a className="brand" href="/" aria-label="TerraNewsphere"><span className="brand-icon">◎</span> TERRA<span>NEWS</span>PHERE</a>
+      </div>
       <div className="top-actions"><span className="live-indicator"><i />{text.live}</span>
         <select aria-label={text.language} value={locale} onChange={(event) => setLocale(event.target.value)}>
           <option value="en">English</option><option value="ko">한국어</option>
         </select></div>
     </header>
     <div className="workspace">
-      <aside className="sidebar">
+      <aside id="news-sidebar" className="sidebar" hidden={!sidebarOpen}>
         <div className="eyebrow">{text.eyebrow}</div>
         <h1>{text.tagline}</h1><p className="subtitle">{text.subtitle}</p>
         <div className="stats"><div><strong>{overview ? `${overview.complete ? '' : '≥'}${overview.total.toLocaleString(locale)}` : '—'}</strong><span>{text.totalStored}</span></div>
