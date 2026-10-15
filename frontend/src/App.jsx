@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import * as Cesium from 'cesium';
 import { initialLocale, messages } from './i18n.js';
 import { countryName, regionName, locationName, locationsName } from './geo.js';
@@ -44,6 +44,7 @@ export default function App() {
   const viewUpdate = useRef(null);
   const generation = useRef(0);
   const bubble = useRef(null);
+  const hoverCard = useRef(null);
   const mapLocale = useRef(locale);
   const mapSelection = useRef({ country, adm1, adm2 });
 
@@ -453,6 +454,14 @@ export default function App() {
     return remove;
   }, [selected, preview]);
 
+  useLayoutEffect(() => {
+    const element = hoverCard.current;
+    const stage = host.current;
+    if (!hover || !element || !stage) return;
+    element.style.left = `${Math.max(12, Math.min(hover.x + 18, stage.clientWidth - element.offsetWidth - 12))}px`;
+    element.style.top = `${Math.max(12, Math.min(hover.y - 70, stage.clientHeight - element.offsetHeight - 12))}px`;
+  }, [hover, locale]);
+
   const title = (item) => item.translations?.[locale]?.title || item.title;
   const summary = (item) => item.translations?.[locale]?.summary || item.summary;
   const content = preview && !preview.error ? preview.content.translations?.[locale] || preview.content : null;
@@ -532,7 +541,7 @@ export default function App() {
           <span><i className="adm2-line" />{text.adm2}</span>
         </div>
         {globeError && <p className="globe-error">{globeError === 'webgl' ? text.globeError : text.geographyError}</p>}
-        {hover && <div className="hover-preview" style={{ left: Math.min(hover.x + 15, (host.current?.clientWidth || 500) - 270), top: Math.max(10, hover.y - 55) }}>
+        {hover && <div ref={hoverCard} className="hover-preview">
           <Thumbnail url={hover.item.thumbnail_url} /><div><small>{locationsName(hover.item.locations, locale)}</small><span>{title(hover.item)}</span>
             {summary(hover.item) && <p className="story-summary">{summary(hover.item)}</p>}</div>
         </div>}
