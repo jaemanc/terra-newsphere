@@ -41,3 +41,40 @@ test('one stable article anchor prefers event, confidence, then detail without r
   assert.equal(primaryLocation([confident, district]), district);
   assert.equal(locationsName(locations, 'en'), 'United Arab Emirates / United States / Iran');
 });
+
+import { countryAreas, markerPosition, uncertainLocation } from './marker-placement.js';
+import { readFileSync } from 'node:fs';
+
+test('country-only display points are stable, varied, inside land and outside holes; real coordinates remain intact', () => {
+  const square = [[0,0],[10,0],[10,10],[0,10],[0,0]];
+  const hole = [[3,3],[7,3],[7,7],[3,7],[3,3]];
+  const areas = countryAreas([{properties:{country_code:'XX'},geometry:{type:'Polygon',coordinates:[square,hole]}}]);
+  const location = {country_code:'XX',longitude:1,latitude:1,coordinate_source:'capital_fallback',association_kind:'mentioned'};
+  const snapshot = structuredClone(location), points = new Set();
+  for(let n=0;n<100;n++) {
+    const item={news_id:String(n)}, point=markerPosition(item,location,areas);
+    assert.deepEqual(point,markerPosition(item,location,areas));
+    assert(point.longitude>0&&point.longitude<10&&point.latitude>0&&point.latitude<10);
+    assert(!(point.longitude>3&&point.longitude<7&&point.latitude>3&&point.latitude<7));
+    points.add(JSON.stringify(point));
+  }
+  assert.equal(points.size,100);assert.deepEqual(location,snapshot);
+  assert(uncertainLocation(location));
+  const exact={...location,coordinate_source:'verified_place',association_kind:'event'};
+  assert.equal(uncertainLocation(exact),false);
+  assert(uncertainLocation({...exact,association_kind:'mentioned'}));
+  assert(uncertainLocation({...exact,coordinate_source:'region_centroid'}));
+  assert.deepEqual(markerPosition({news_id:'1'},exact,areas),{longitude:1,latitude:1});
+  assert.deepEqual(markerPosition({news_id:'1'},location,new Map()),{longitude:1,latitude:1});
+  const dateLine=countryAreas([{properties:{country_code:'XX'},geometry:{type:'Polygon',coordinates:[[[170,-10],[-170,-10],[-170,10],[170,10],[170,-10]]]}}]);
+  assert(Math.abs(markerPosition({news_id:'date-line'},location,dateLine).longitude)>=170);
+  const polar=countryAreas([{properties:{country_code:'XX'},geometry:{type:'Polygon',coordinates:[[[-180,-90],[180,-90],[180,-80],[-180,-80],[-180,-90]]]}}]);
+  assert(markerPosition({news_id:'polar'},location,polar).latitude < -80);
+  const countries=JSON.parse(readFileSync(new URL('../public/geo/countries.geojson',import.meta.url)));
+  const realAreas=countryAreas(countries.features);
+  const australia=markerPosition({news_id:'australia'}, {...location,country_code:'AU'}, realAreas);
+  assert(australia.latitude < -15); // AU has separate territory features; prefer its mainland.
+  const france={...location,country_code:'FR'};
+  const point=markerPosition({news_id:'france'},france,realAreas);
+  assert(point.longitude>-6&&point.longitude<10&&point.latitude>41&&point.latitude<52);
+});

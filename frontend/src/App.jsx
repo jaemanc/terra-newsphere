@@ -5,6 +5,7 @@ import { countryName, regionName, locationName, locationsName, primaryLocation }
 import { decorateLayer, MARKER_HEIGHT } from './map-layers.js';
 import { overviewLayer, detailLayer, satellite } from './imagery.js';
 import { createNewsLayer, updateNewsLayer } from './news-layer.js';
+import { countryAreas, markerPosition, uncertainLocation } from './marker-placement.js';
 
 const FALLBACK = '/images/fallback.svg';
 
@@ -23,6 +24,10 @@ export default function App() {
   const [countries, setCountries] = useState([]);
   const [regions, setRegions] = useState({ adm1: [], adm2: [] });
   const [items, setItems] = useState([]);
+  const [mapItems, setMapItems] = useState([]);
+  const [areas, setAreas] = useState(null);
+  const [mapStatus, setMapStatus] = useState('loading');
+  const [mapLimited, setMapLimited] = useState(false);
   const [cursor, setCursor] = useState(null);
   const [pageHistory, setPageHistory] = useState([0]);
   const [overview, setOverview] = useState(null);
@@ -178,6 +183,7 @@ export default function App() {
       ]).then(async ([index, boundaries]) => {
         if (!alive) return;
         manifest.current = index;
+        setAreas(countryAreas(boundaries.features));
         setCountries([...new Map(boundaries.features.map(feature =>
           [feature.properties.country_code, feature.properties])).values()].sort((a, b) => a.name.localeCompare(b.name)));
         const layer = await Cesium.GeoJsonDataSource.load(boundaries, {
@@ -193,7 +199,7 @@ export default function App() {
       handler = new Cesium.ScreenSpaceEventHandler(globe.scene.canvas);
       handler.setInputAction((movement) => {
         const entity = globe.scene.pick(movement.endPosition)?.id;
-        setHover(entity?.news ? { item: entity.news, x: movement.endPosition.x, y: movement.endPosition.y } : null);
+        setHover(entity?.news ? { item: entity.news, location: entity.newsLocation, x: movement.endPosition.x, y: movement.endPosition.y } : null);
         globe.scene.canvas.style.cursor = entity?.news ? 'pointer' : 'grab';
       }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
       handler.setInputAction((movement) => {
@@ -344,6 +350,39 @@ export default function App() {
     if (refresh && view) loadNews(pageHistory.at(-1));
   }, [refresh]);
 
+  // Map data is independent of sidebar pagination. Coordinates may be country-level
+  // presentation anchors, so capital-based bbox filtering would hide dispersed dots.
+  useEffect(() => {
+    const controller = new AbortController();
+    setMapStatus('loading');
+    (async () => {
+      const params = new URLSearchParams({ limit: '200', include_demo: 'false', located_only: 'true' });
+      if (country) params.set('country', country);
+      if (adm1) params.set('adm1', adm1);
+      if (adm2) params.set('adm2', adm2);
+      const next = new Map();
+      let cursor = 0;
+      for (let pages = 0; pages < 10 && cursor !== null && next.size < 1000; pages++) {
+        params.set('cursor', String(cursor));
+        params.set('limit', String(Math.min(200, 1000 - next.size)));
+        const response = await fetch(`/api/news/markers?${params}`, { signal: controller.signal, cache: 'no-store' });
+        if (!response.ok) throw new Error();
+        const data = await response.json();
+        for (const item of data.items) next.set(item.news_id, item);
+        cursor = data.next_cursor;
+      }
+      if (controller.signal.aborted) return;
+      setMapItems([...next.values()].filter(item => Date.parse(item.expires_at) > Date.now()));
+      setMapLimited(cursor !== null);
+      setMapStatus('ok');
+    })().catch(error => {
+      if (error.name !== 'AbortError' && !controller.signal.aborted) {
+        setMapItems([]); setMapStatus('error');
+      }
+    });
+    return () => controller.abort();
+  }, [country, adm1, adm2, refresh]);
+
   useEffect(() => {
     const controller = new AbortController();
     fetch('/api/news/stats', { signal: controller.signal, cache: 'no-store' })
@@ -367,18 +406,20 @@ export default function App() {
   }, [items.length > 0]);
 
   useEffect(() => {
-    if (!items.length) return;
-    const delay = Math.max(0, Math.min(...items.map((item) => Date.parse(item.expires_at))) - Date.now());
+    const loaded = [...items, ...mapItems];
+    if (!loaded.length) return;
+    const delay = Math.max(0, Math.min(...loaded.map((item) => Date.parse(item.expires_at))) - Date.now());
     const timer = setTimeout(() => {
       setItems((previous) => previous.filter((item) => Date.parse(item.expires_at) > Date.now()));
+      setMapItems((previous) => previous.filter((item) => Date.parse(item.expires_at) > Date.now()));
       setSelected(null); setHover(null);
     }, delay + 1);
     return () => clearTimeout(timer);
-  }, [items]);
+  }, [items, mapItems]);
 
   useEffect(() => {
-    if (!ready || !markers.current) return;
-    updateNewsLayer(markers.current, items, viewer.current, mapLocale);
+    if (!ready || !markers.current || !areas) return;
+    updateNewsLayer(markers.current, mapItems, viewer.current, mapLocale, areas);
     // Label glyph atlases become ready after the data source's sticky ready flag.
     // Render a few frames on news changes, then return to the idle render mode.
     let frames = 0;
@@ -389,7 +430,7 @@ export default function App() {
     };
     renderLabels();
     return () => cancelAnimationFrame(frame);
-  }, [items, ready, locale]);
+  }, [mapItems, ready, locale, areas]);
 
   useEffect(() => {
     setPreview(null);
@@ -411,7 +452,8 @@ export default function App() {
   useEffect(() => {
     const globe = viewer.current;
     if (!selected || !globe || !bubble.current) return;
-    const position = selected.location && Cesium.Cartesian3.fromDegrees(selected.location.longitude, selected.location.latitude, MARKER_HEIGHT);
+    const anchor = selected.location && markerPosition(selected.item, selected.location, areas || new Map());
+    const position = anchor && Cesium.Cartesian3.fromDegrees(anchor.longitude, anchor.latitude, MARKER_HEIGHT);
     const update = () => {
       const element = bubble.current;
       if (!element) return;
@@ -432,7 +474,7 @@ export default function App() {
     const remove = globe.scene.postRender.addEventListener(update);
     update(); globe.scene.requestRender();
     return remove;
-  }, [selected, preview]);
+  }, [selected, preview, areas]);
 
   useLayoutEffect(() => {
     const element = hoverCard.current;
@@ -488,6 +530,7 @@ export default function App() {
         <h1>{text.tagline}</h1><p className="subtitle">{text.subtitle}</p>
         <div className="stats"><div><strong>{overview ? `${overview.complete ? '' : '≥'}${overview.total.toLocaleString(locale)}` : '—'}</strong><span>{text.totalStored}</span></div>
           <div><strong>168<span>h</span></strong><span>{text.days}</span></div></div>
+        <div className="marker-legend"><p><i className="marker-key confirmed" />{text.confirmedMarker}</p><p><i className="marker-key uncertain" />{text.uncertainMarker}</p><small>{text.markerExplanation}</small></div>
         <label className="region-label" htmlFor="country">{text.region}</label>
         <select id="country" value={country} onChange={(event) => chooseCountry(event.target.value)}>
           <option value="">{text.all}</option>{countries.map((item) => <option key={item.country_code} value={item.country_code}>{countryName(item.country_code, locale, item.name)}</option>)}
@@ -508,7 +551,8 @@ export default function App() {
               <a href={item.url} target="_blank" rel="noopener noreferrer">{item.publisher} ↗</a></div>
             <button className="story-open" onClick={() => {
               const location = primaryLocation(item.locations); setSelected({ item, location });
-              if (location) viewer.current?.camera.flyTo({ destination: Cesium.Cartesian3.fromDegrees(location.longitude, location.latitude, 2200000), duration: 1.2,
+              const anchor = location && markerPosition(item, location, areas || new Map());
+              if (anchor) viewer.current?.camera.flyTo({ destination: Cesium.Cartesian3.fromDegrees(anchor.longitude, anchor.latitude, 2200000), duration: 1.2,
                 complete: () => viewUpdate.current?.() });
             }}>
               <div className="story-body"><div className="story-copy"><h2>{title(item)}</h2>
@@ -541,6 +585,7 @@ export default function App() {
         {globeError && <p className="globe-error">{globeError === 'webgl' ? text.globeError : text.geographyError}</p>}
         {hover && <div ref={hoverCard} className="hover-preview">
           <Thumbnail url={hover.item.thumbnail_url} /><div><small>{locationsName(hover.item.locations, locale)}</small><span>{title(hover.item)}</span>
+            {hover.location && uncertainLocation(hover.location) && <small>{text.uncertainMarker}</small>}
             {summary(hover.item) && <p className="story-summary">{summary(hover.item)}</p>}</div>
         </div>}
         {selected && <article ref={bubble} className="news-bubble" aria-live="polite">
@@ -551,7 +596,7 @@ export default function App() {
             <p className="news-location">{text.reportedLocation}: {preview?.locations
               ? locationsName(preview.locations, locale) || text.unlocated : selected.location ? locationName(selected.location, locale) : text.unlocated}</p>
             {preview?.error ? <p>{text.unavailable}</p> : <p>{content?.summary || (preview ? text.noSummary : text.loading)}</p>}
-            {selected.location && <small>{selected.location.coordinate_source === 'capital_fallback' ? text.capital : text.centroid}</small>}
+            {selected.location && <small>{selected.location.coordinate_source === 'capital_fallback' ? text.distributed : selected.location.coordinate_source === 'verified_place' ? (uncertainLocation(selected.location) ? text.uncertainMarker : text.confirmedMarker) : text.centroid}</small>}
             {selected.location?.association_kind === 'mentioned' && <small>{text.mentioned}</small>}
             {preview && !preview.error && <><small>{text.original}: {preview.content.language}</small>
               <a href={preview.source.url} target="_blank" rel="noopener noreferrer">{text.source} ↗</a></>}
@@ -560,7 +605,7 @@ export default function App() {
         {(view?.height < 3000000 || imageryLoading) && <div className="map-mode">{imageryUnavailable ? text.imageryFallback : imageryLoading ? text.imageryLoading : satellite ? text.satelliteMap : text.detailMap}
           {country && !manifest.current?.administrative[country] && <span>{text.countryOnly}</span>}
         </div>}
-        <div className="globe-bottom"><span>{text.instruction}</span><span className="view-count">{items.length} {text.stories}</span></div>
+        <div className="globe-bottom"><span>{text.instruction}</span><span className="view-count">{mapStatus === 'loading' ? text.loading : mapStatus === 'error' ? text.unavailable : `${mapItems.length} ${text.mapStories}${mapLimited ? ' · ' + text.mapLimit : ''}`}</span></div>
       </section>
     </div>
   </main>;

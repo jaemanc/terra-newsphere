@@ -51,7 +51,7 @@ class NewsStore:
     def list(self, country: str | None = None, adm1: str | None = None, adm2: str | None = None,
              bbox: tuple[float, float, float, float] | None = None,
              limit: int = 100, cursor: int = 0, include_unlocated: bool = False,
-             include_demo: bool = True) -> tuple[list[News], int | None]:
+             include_demo: bool = True, located_only: bool = False) -> tuple[list[News], int | None]:
         key = "news:all"
         if country:
             key = f"news:geo:country:{country}"
@@ -72,6 +72,8 @@ class NewsStore:
             consumed += 1
             article = _decode_article(value)
             if article is None:
+                continue
+            if located_only and not article.locations:
                 continue
             if article.is_demo and not include_demo:
                 continue
