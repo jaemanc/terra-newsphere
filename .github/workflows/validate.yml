@@ -54,4 +54,6 @@ jobs:
           uv sync --frozen --python 3.12 --extra api --extra collector --extra geo --extra dev
           npm --prefix frontend ci
       - name: Validate API, retention, globe build and ARM64 pipeline
+        env:
+          COMPOSE_FILE: compose.yaml:deploy/compose.validation.yaml
         run: .venv/bin/python scripts/verify.py --containers

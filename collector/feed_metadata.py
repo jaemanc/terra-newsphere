@@ -50,4 +50,15 @@ def mentioned_locations(text: str, geography) -> list[dict]:
             reference = {"country_code": code, "role": "mentioned", "confidence": 0.5}
             if reference not in references:
                 references.append(reference)
+    korean_names = {"대한민국": "KR", "북한": "KP", "미국": "US", "중국": "CN", "일본": "JP",
+                    "영국": "GB", "프랑스": "FR", "독일": "DE", "러시아": "RU", "우크라이나": "UA",
+                    "이스라엘": "IL", "이란": "IR", "인도": "IN", "네팔": "NP", "파키스탄": "PK",
+                    "캐나다": "CA", "호주": "AU", "브라질": "BR", "이탈리아": "IT", "스페인": "ES",
+                    "베트남": "VN", "필리핀": "PH", "태국": "TH", "인도네시아": "ID"}
+    for name, code in korean_names.items():
+        # Match standalone names and Korean particles, not longer country names or person names.
+        if code in geography.countries and re.search(r"(?<!\w)" + re.escape(name) + r"(?=[은는이가을를의에와과도\s.,·]|$)", text):
+            reference = {"country_code": code, "role": "mentioned", "confidence": 0.5}
+            if reference not in references:
+                references.append(reference)
     return references[:20]

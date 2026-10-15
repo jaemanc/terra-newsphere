@@ -58,6 +58,10 @@ class NewsCycle(unittest.TestCase):
         self.assertEqual(article_id("https://example.com/report?utm_source=x"), article_id("https://example.com/report"))
         self.assertEqual(article_id("https://www.bbc.co.uk/news/articles/story?at_medium=RSS&at_campaign=rss"),
                          article_id("https://www.bbc.co.uk/news/articles/story"))
+        self.assertEqual(article_id("https://news.sbs.co.kr/news/endPage.do?news_id=123&plink=RSSREADER&cooper=RSS"),
+                         article_id("https://news.sbs.co.kr/news/endPage.do?news_id=123"))
+        self.assertNotEqual(article_id("https://example.com/story?cooper=one"),
+                            article_id("https://example.com/story?cooper=two"))
         compressed = io.BytesIO()
         fips_code = next(code for code, iso in self.store.geography.data["fips_to_iso"].items() if iso == "KR")
         columns = ["", now.strftime("%Y%m%d%H%M%S"), "1", "example.com", "https://example.com/report", "", "", "", "", "",
@@ -154,6 +158,13 @@ class NewsCycle(unittest.TestCase):
             self.assertEqual([item["news_id"] for item in unknown], [unlocated.news_id])
             real = client.get("/api/news/markers?include_demo=false").json()["items"]
             self.assertNotIn(demo.news_id, [item["news_id"] for item in real])
+            self.database.zadd("news:all", {"0" * 64: time.time() + 300})
+            totals = client.get("/api/news/stats")
+            self.assertEqual(totals.headers["cache-control"], "no-store")
+            self.assertEqual(totals.json()["total"], len(real))
+            self.assertEqual(totals.json()["located"], sum(bool(item["locations"]) for item in real))
+            self.assertTrue(totals.json()["complete"])
+            self.assertTrue(totals.json()["expires_at"])
             self.assertEqual(client.get(f"/api/news/{article.news_id}").json()["content"]["title"], "Original headline")
             self.assertEqual(client.get("/api/news/markers?adm1=unvalidated").status_code, 422)
             self.assertEqual(client.get("/api/news/markers?limit=10000").status_code, 422)
@@ -167,6 +178,7 @@ class NewsCycle(unittest.TestCase):
             self.database.zadd("news:geo:country:KR", {near_expiry.news_id: time.time() + 100})
             items = client.get("/api/news/markers?country=KR").json()["items"]
             self.assertNotIn(near_expiry.news_id, [item["news_id"] for item in items])
+            self.assertEqual(client.get("/api/news/stats").json()["total"], len(real) - 1)
 
 
 if __name__ == "__main__":
