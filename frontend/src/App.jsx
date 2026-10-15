@@ -164,7 +164,7 @@ export default function App() {
       const news = createNewsLayer(globe, mapLocale);
       newsResize = new ResizeObserver(() => {
         globe.resize();
-        news.clustering.pixelRange = globe.canvas.clientWidth < 600 ? 80 : 64;
+        news.clustering.pixelRange = globe.canvas.clientWidth < 600 ? 8 : 6;
         setHover(null);
         globe.scene.requestRender();
         viewUpdate.current?.();

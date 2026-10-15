@@ -18,7 +18,8 @@ function headline(item, globe, locale) {
 export function createNewsLayer(globe, locale) {
   const news = new Cesium.CustomDataSource('news');
   news.clustering.enabled = true;
-  news.clustering.pixelRange = 64;
+  // Cesium also includes the headline width; only add a small grouping margin.
+  news.clustering.pixelRange = globe.canvas.clientWidth < 600 ? 8 : 6;
   news.clustering.minimumClusterSize = 2;
   news.clustering.clusterEvent.addEventListener((entities, cluster) => {
     const representative = latestNewsEntity(entities);
