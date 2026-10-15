@@ -1,7 +1,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import * as Cesium from 'cesium';
 import { initialLocale, messages } from './i18n.js';
-import { countryName, regionName, locationName, locationsName } from './geo.js';
+import { countryName, regionName, locationName, locationsName, primaryLocation } from './geo.js';
 import { decorateLayer, MARKER_HEIGHT } from './map-layers.js';
 import { overviewLayer, detailLayer, satellite } from './imagery.js';
 import { createNewsLayer, updateNewsLayer } from './news-layer.js';
@@ -507,7 +507,7 @@ export default function App() {
             <div className="story-meta"><span>{locationsName(item.locations, locale) || text.unlocated}</span>
               <a href={item.url} target="_blank" rel="noopener noreferrer">{item.publisher} ↗</a></div>
             <button className="story-open" onClick={() => {
-              const location = item.locations[0] || null; setSelected({ item, location });
+              const location = primaryLocation(item.locations); setSelected({ item, location });
               if (location) viewer.current?.camera.flyTo({ destination: Cesium.Cartesian3.fromDegrees(location.longitude, location.latitude, 2200000), duration: 1.2,
                 complete: () => viewUpdate.current?.() });
             }}>

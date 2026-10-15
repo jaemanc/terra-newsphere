@@ -1,6 +1,7 @@
 import * as Cesium from 'cesium';
 import { MARKER_HEIGHT } from './map-layers.js';
 import { shortHeadline, latestNewsEntity } from './news-labels.js';
+import { primaryLocation } from './geo.js';
 
 const RIPPLE_IMAGE = '/images/news-ripple.svg';
 const labelStyle = {
@@ -40,15 +41,16 @@ export function createNewsLayer(globe, locale) {
 export function updateNewsLayer(layer, items, globe, locale) {
   layer.entities.removeAll();
   for (const item of items) {
-    item.locations.forEach((location, index) => {
+    const location = primaryLocation(item.locations);
+    if (location) {
       const entity = layer.entities.add({
-        id: `${item.news_id}:${index}`,
+        id: item.news_id,
         position: Cesium.Cartesian3.fromDegrees(location.longitude, location.latitude, MARKER_HEIGHT),
         billboard: { image: RIPPLE_IMAGE, width: 44, height: 44, heightReference: Cesium.HeightReference.NONE },
         label: { ...labelStyle, text: new Cesium.CallbackProperty(() => headline(item, globe, locale), false) },
       });
       entity.news = item;
       entity.newsLocation = location;
-    });
+    }
   }
 }
