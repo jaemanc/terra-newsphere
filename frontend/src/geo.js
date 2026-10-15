@@ -38,3 +38,12 @@ export function locationName(location, locale) {
 export function locationsName(locations, locale) {
   return [...new Set(locations.map(location => locationName(location, locale)))].join(' / ');
 }
+
+// Choose one presentation anchor, while retaining every association in article details.
+export function primaryLocation(locations) {
+  const detail = { country: 0, adm1: 1, adm2: 2, city: 2 };
+  return [...locations].sort((a, b) =>
+    Number(b.association_kind === 'event') - Number(a.association_kind === 'event')
+    || (b.confidence ?? 0) - (a.confidence ?? 0)
+    || (detail[b.location_type] ?? 0) - (detail[a.location_type] ?? 0))[0] || null;
+}

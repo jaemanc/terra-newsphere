@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { locationName, locationsName } from './geo.js';
+import { locationName, locationsName, primaryLocation } from './geo.js';
 import { shortHeadline, latestNewsEntity } from './news-labels.js';
 
 test('globe headlines are a single line, add literal dots only after truncation, and preserve Unicode', () => {
@@ -24,4 +24,20 @@ test('country-only news stays country-only; known regions and multiple locations
   assert.equal(locationName(district, 'en'), 'South Korea · Gangwon · Sokcho-si');
   assert.equal(locationName({ ...country, region_name: 'Seoul', district_name: 'Jongno-gu' }, 'ko'), '대한민국 · 서울 · 종로구');
   assert.equal(locationsName([country, country, district], 'ko'), '대한민국 / 대한민국 · 강원 · 속초시');
+});
+
+test('one stable article anchor prefers event, confidence, then detail without removing associations', () => {
+  const mention = code => ({ country_code: code, association_kind: 'mentioned', confidence: .5, location_type: 'country' });
+  const locations = [mention('AE'), mention('US'), mention('IR')];
+  const original = structuredClone(locations);
+  assert.equal(primaryLocation(locations), locations[0]);
+  assert.deepEqual(locations, original);
+  assert.equal(primaryLocation([]), null);
+  const event = { ...mention('IR'), association_kind: 'event', confidence: .4 };
+  assert.equal(primaryLocation([...locations, event]), event);
+  const confident = { ...event, confidence: .9 };
+  assert.equal(primaryLocation([event, confident]), confident);
+  const district = { ...confident, location_type: 'adm2' };
+  assert.equal(primaryLocation([confident, district]), district);
+  assert.equal(locationsName(locations, 'en'), 'United Arab Emirates / United States / Iran');
 });
