@@ -23,6 +23,8 @@ export default function App() {
   const [regions, setRegions] = useState({ adm1: [], adm2: [] });
   const [items, setItems] = useState([]);
   const [cursor, setCursor] = useState(null);
+  const [pageHistory, setPageHistory] = useState([0]);
+  const [overview, setOverview] = useState(null);
   const [status, setStatus] = useState('loading');
   const [view, setView] = useState(null);
   const [refresh, setRefresh] = useState(0);
@@ -317,7 +319,7 @@ export default function App() {
     return () => { alive = false; };
   }, [country, view?.height, ready]);
 
-  async function loadNews(nextCursor = 0, append = false) {
+  async function loadNews(nextCursor = 0, history = null) {
     request.current?.abort();
     const controller = new AbortController();
     request.current = controller;
@@ -334,20 +336,18 @@ export default function App() {
       let pages = 0;
       do {
         params.set('cursor', String(data.next_cursor));
-        params.set('limit', String(append ? 200 : Math.min(200, 500 - data.items.length)));
+        params.set('limit', String(Math.min(200, 500 - data.items.length)));
         const response = await fetch(`/api/news/markers?${params}`, { signal: controller.signal, cache: 'no-store' });
         if (!response.ok) throw new Error();
         const page = await response.json();
         pages += 1;
         data.items.push(...page.items);
         data.next_cursor = page.next_cursor;
-      } while (!append && pages < 3 && data.next_cursor !== null && data.items.length < 500);
+      } while (pages < 3 && data.next_cursor !== null && data.items.length < 500);
       if (current !== generation.current) return;
-      setItems((previous) => {
-        const combined = append ? [...previous, ...data.items] : data.items;
-        // ponytail: bounded client list; refine the region when more than 500 stories are needed.
-        return [...new Map(combined.map((item) => [item.news_id, item])).values()].slice(-500);
-      });
+      // Keep one bounded page in memory; older news remains accessible on later pages.
+      setItems([...new Map(data.items.map((item) => [item.news_id, item])).values()]);
+      if (history) setPageHistory(history);
       setCursor(data.next_cursor);
       setStatus('ok');
     } catch (error) {
@@ -358,9 +358,31 @@ export default function App() {
   useEffect(() => {
     if (!view) return;
     setHover(null);
+    setPageHistory([0]);
     loadNews();
     return () => { request.current?.abort(); };
-  }, [country, adm1, adm2, view?.bbox, refresh]);
+  }, [country, adm1, adm2, view?.bbox]);
+
+  useEffect(() => {
+    if (refresh && view) loadNews(pageHistory.at(-1));
+  }, [refresh]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch('/api/news/stats', { signal: controller.signal, cache: 'no-store' })
+      .then((response) => { if (!response.ok) throw new Error(); return response.json(); })
+      .then(setOverview).catch((error) => { if (error.name !== 'AbortError') setOverview(null); });
+    return () => controller.abort();
+  }, [refresh]);
+
+  useEffect(() => {
+    if (!overview?.expires_at) return;
+    const timer = setTimeout(() => {
+      setOverview(null);
+      setRefresh((value) => value + 1);
+    }, Math.max(0, Date.parse(overview.expires_at) - Date.now()) + 1);
+    return () => clearTimeout(timer);
+  }, [overview]);
 
   useEffect(() => {
     const timer = setInterval(() => setRefresh((value) => value + 1), items.length ? 60000 : 5000);
@@ -496,7 +518,7 @@ export default function App() {
       <aside className="sidebar">
         <div className="eyebrow">{text.eyebrow}</div>
         <h1>{text.tagline}</h1><p className="subtitle">{text.subtitle}</p>
-        <div className="stats"><div><strong>{shownItems.length.toString().padStart(2, '0')}</strong><span>{text.count}</span></div>
+        <div className="stats"><div><strong>{overview ? `${overview.complete ? '' : '≥'}${overview.total.toLocaleString(locale)}` : '—'}</strong><span>{text.totalStored}</span></div>
           <div><strong>168<span>h</span></strong><span>{text.days}</span></div></div>
         <label className="region-label" htmlFor="country">{text.region}</label>
         <select id="country" value={country} onChange={(event) => chooseCountry(event.target.value)}>
@@ -525,8 +547,16 @@ export default function App() {
                 {summary(item) && <p className="story-summary">{summary(item)}</p>}</div><Thumbnail url={item.thumbnail_url} /></div>
             </button>
           </article>)}
-          {cursor !== null && <button className="more" disabled={status === 'loading'} onClick={() => loadNews(cursor, true)}>{text.more}</button>}
         </div>
+        <nav className="pagination" aria-label={text.pagination}>
+          <button disabled={status === 'loading' || pageHistory.length === 1} onClick={() => {
+            const previous = pageHistory.slice(0, -1); loadNews(previous.at(-1), previous);
+          }}>{text.previous}</button>
+          <span>{text.page} {pageHistory.length}<small>{shownItems.length.toLocaleString(locale)} {text.stories}</small></span>
+          <button disabled={status === 'loading' || cursor === null} onClick={() => {
+            loadNews(cursor, [...pageHistory, cursor]);
+          }}>{text.next}</button>
+        </nav>
         <a className="attribution" href="/geo/manifest.json" target="_blank" rel="noopener noreferrer">{text.attribution} ↗</a>
       </aside>
       <section className="globe-stage" aria-label="Interactive news globe">

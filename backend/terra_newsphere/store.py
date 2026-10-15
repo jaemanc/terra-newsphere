@@ -1,11 +1,12 @@
 import json
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 from redis import Redis
 
 from .geography import Geography
-from .models import News
+from .models import News, RETENTION_SECONDS
 from .connection import redis_client
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -90,3 +91,38 @@ class NewsStore:
         offset = cursor + consumed
         next_cursor = offset if offset < self.redis.zcount(key, f"({time.time()}", "+inf") else None
         return articles, next_cursor
+
+    def stats(self) -> dict:
+        """Count live, non-demo records without trusting stale index members."""
+        total = located = 0
+        publishers = set()
+        seen = set()
+        earliest = None
+        # Bound request work and memory; report a lower bound beyond 10,000 candidates.
+        now = time.time()
+        maximum = now + RETENTION_SECONDS
+        candidates = self.redis.zcount("news:all", f"({now}", maximum)
+        scanned = 0
+        for cursor in range(0, min(candidates, 10000), 500):
+            ids = self.redis.zrevrangebyscore("news:all", maximum, f"({now}", start=cursor, num=500)
+            pipe = self.redis.pipeline(transaction=False)
+            for news_id in ids:
+                pipe.get(f"news:article:{news_id}")
+            for value in pipe.execute():
+                if not value:
+                    continue
+                data = json.loads(value)
+                if data["news_id"] in seen:
+                    continue
+                seen.add(data["news_id"])
+                expiry = data["_expires_epoch"]
+                if expiry <= time.time() or data.get("is_demo"):
+                    continue
+                total += 1
+                located += bool(data.get("locations"))
+                publishers.add(data["source"]["publisher"])
+                earliest = expiry if earliest is None else min(earliest, expiry)
+            scanned += len(ids)
+        return {"total": total, "located": located, "publisher_count": len(publishers),
+                "complete": scanned >= candidates,
+                "expires_at": datetime.fromtimestamp(earliest, timezone.utc).isoformat() if earliest else None}

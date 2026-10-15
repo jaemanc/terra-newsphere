@@ -77,6 +77,11 @@ def markers(request: Request,
             "next_cursor": next_cursor}
 
 
+@app.get("/api/news/stats")
+def stats(request: Request):
+    return request.app.state.store.stats()
+
+
 @app.get("/api/news/{news_id}")
 def preview(news_id: str, request: Request):
     if len(news_id) != 64 or any(char not in "0123456789abcdef" for char in news_id):

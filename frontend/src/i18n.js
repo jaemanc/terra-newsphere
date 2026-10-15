@@ -18,6 +18,7 @@ export const messages = {
     detailMap: 'Detailed map', satelliteMap: 'Satellite map', imageryFallback: 'Background unavailable · local boundary map',
     imageryLoading: 'Loading detailed map…',
     unlocated: 'Location unconfirmed',
+    totalStored: 'All stored stories', pagination: 'News pages', previous: 'Previous', next: 'Next', page: 'Page',
   },
   ko: {
     eyebrow: '지금, 세계의 이야기', tagline: '지구 위의 뉴스', subtitle: '지구를 돌려 최근 7일의 뉴스를 만나보세요.',
@@ -38,6 +39,7 @@ export const messages = {
     detailMap: '상세 지도', satelliteMap: '위성 지도', imageryFallback: '배경 지도 연결 실패 · 기본 경계 지도',
     imageryLoading: '상세 지도 연결 중…',
     unlocated: '위치 미확인',
+    totalStored: '전체 보관 기사', pagination: '뉴스 페이지', previous: '이전', next: '다음', page: '페이지',
   },
 };
 

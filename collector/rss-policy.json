@@ -238,5 +238,199 @@
     "usage": "Individual local development RSS display; preserve supplied text/images and prominent BBC News source link. Commercial deployments require BBC permission.",
     "terms_url": "https://www.bbc.com/pages/terms-of-use",
     "checked_at": "2026-10-14"
+  },
+  "https://www.lemonde.fr/en/international/rss_full.xml": {
+    "publisher": "Le Monde",
+    "allow_summaries": true,
+    "allow_thumbnails": false,
+    "thumbnail_hosts": [],
+    "allow_location_mentions": true,
+    "usage": "Personal local RSS reading only.",
+    "terms_url": "https://www.lemonde.fr/en/about-us/article/2026/03/27/le-monde-rss-feeds_6751860_115.html",
+    "checked_at": "2026-10-15"
+  },
+  "https://www.lemonde.fr/en/europe/rss_full.xml": {
+    "publisher": "Le Monde",
+    "allow_summaries": true,
+    "allow_thumbnails": false,
+    "thumbnail_hosts": [],
+    "allow_location_mentions": true,
+    "usage": "Personal local RSS reading only.",
+    "terms_url": "https://www.lemonde.fr/en/about-us/article/2026/03/27/le-monde-rss-feeds_6751860_115.html",
+    "checked_at": "2026-10-15"
+  },
+  "https://www.lemonde.fr/en/france/rss_full.xml": {
+    "publisher": "Le Monde",
+    "allow_summaries": true,
+    "allow_thumbnails": false,
+    "thumbnail_hosts": [],
+    "allow_location_mentions": true,
+    "usage": "Personal local RSS reading only.",
+    "terms_url": "https://www.lemonde.fr/en/about-us/article/2026/03/27/le-monde-rss-feeds_6751860_115.html",
+    "checked_at": "2026-10-15"
+  },
+  "https://www.lemonde.fr/en/economy/rss_full.xml": {
+    "publisher": "Le Monde",
+    "allow_summaries": true,
+    "allow_thumbnails": false,
+    "thumbnail_hosts": [],
+    "allow_location_mentions": true,
+    "usage": "Personal local RSS reading only.",
+    "terms_url": "https://www.lemonde.fr/en/about-us/article/2026/03/27/le-monde-rss-feeds_6751860_115.html",
+    "checked_at": "2026-10-15"
+  },
+  "https://www.lemonde.fr/en/politics/rss_full.xml": {
+    "publisher": "Le Monde",
+    "allow_summaries": true,
+    "allow_thumbnails": false,
+    "thumbnail_hosts": [],
+    "allow_location_mentions": true,
+    "usage": "Personal local RSS reading only.",
+    "terms_url": "https://www.lemonde.fr/en/about-us/article/2026/03/27/le-monde-rss-feeds_6751860_115.html",
+    "checked_at": "2026-10-15"
+  },
+  "https://www.lemonde.fr/en/environment/rss_full.xml": {
+    "publisher": "Le Monde",
+    "allow_summaries": true,
+    "allow_thumbnails": false,
+    "thumbnail_hosts": [],
+    "allow_location_mentions": true,
+    "usage": "Personal local RSS reading only.",
+    "terms_url": "https://www.lemonde.fr/en/about-us/article/2026/03/27/le-monde-rss-feeds_6751860_115.html",
+    "checked_at": "2026-10-15"
+  },
+  "https://www.lemonde.fr/en/culture/rss_full.xml": {
+    "publisher": "Le Monde",
+    "allow_summaries": true,
+    "allow_thumbnails": false,
+    "thumbnail_hosts": [],
+    "allow_location_mentions": true,
+    "usage": "Personal local RSS reading only.",
+    "terms_url": "https://www.lemonde.fr/en/about-us/article/2026/03/27/le-monde-rss-feeds_6751860_115.html",
+    "checked_at": "2026-10-15"
+  },
+  "https://www.lemonde.fr/en/science/rss_full.xml": {
+    "publisher": "Le Monde",
+    "allow_summaries": true,
+    "allow_thumbnails": false,
+    "thumbnail_hosts": [],
+    "allow_location_mentions": true,
+    "usage": "Personal local RSS reading only.",
+    "terms_url": "https://www.lemonde.fr/en/about-us/article/2026/03/27/le-monde-rss-feeds_6751860_115.html",
+    "checked_at": "2026-10-15"
+  },
+  "https://www.lemonde.fr/en/sports/rss_full.xml": {
+    "publisher": "Le Monde",
+    "allow_summaries": true,
+    "allow_thumbnails": false,
+    "thumbnail_hosts": [],
+    "allow_location_mentions": true,
+    "usage": "Personal local RSS reading only.",
+    "terms_url": "https://www.lemonde.fr/en/about-us/article/2026/03/27/le-monde-rss-feeds_6751860_115.html",
+    "checked_at": "2026-10-15"
+  },
+  "https://www.lemonde.fr/en/pixels/rss_full.xml": {
+    "publisher": "Le Monde",
+    "allow_summaries": true,
+    "allow_thumbnails": false,
+    "thumbnail_hosts": [],
+    "allow_location_mentions": true,
+    "usage": "Personal local RSS reading only.",
+    "terms_url": "https://www.lemonde.fr/en/about-us/article/2026/03/27/le-monde-rss-feeds_6751860_115.html",
+    "checked_at": "2026-10-15"
+  },
+  "https://news.sbs.co.kr/news/SectionRssFeed.do?sectionId=01&plink=RSSREADER": {
+    "publisher": "SBS News",
+    "allow_summaries": true,
+    "allow_thumbnails": true,
+    "thumbnail_hosts": [
+      "img.sbs.co.kr"
+    ],
+    "allow_location_mentions": true,
+    "usage": "Personal local RSS reading only.",
+    "terms_url": "https://news.sbs.co.kr/news/rss.do",
+    "checked_at": "2026-10-15"
+  },
+  "https://news.sbs.co.kr/news/newsflashRssFeed.do?plink=RSSREADER": {
+    "publisher": "SBS News",
+    "allow_summaries": true,
+    "allow_thumbnails": true,
+    "thumbnail_hosts": [
+      "img.sbs.co.kr"
+    ],
+    "allow_location_mentions": true,
+    "usage": "Personal local RSS reading only.",
+    "terms_url": "https://news.sbs.co.kr/news/rss.do",
+    "checked_at": "2026-10-15"
+  },
+  "https://news.sbs.co.kr/news/SectionRssFeed.do?sectionId=02&plink=RSSREADER": {
+    "publisher": "SBS News",
+    "allow_summaries": true,
+    "allow_thumbnails": true,
+    "thumbnail_hosts": [
+      "img.sbs.co.kr"
+    ],
+    "allow_location_mentions": true,
+    "usage": "Personal local RSS reading only.",
+    "terms_url": "https://news.sbs.co.kr/news/rss.do",
+    "checked_at": "2026-10-15"
+  },
+  "https://news.sbs.co.kr/news/SectionRssFeed.do?sectionId=03&plink=RSSREADER": {
+    "publisher": "SBS News",
+    "allow_summaries": true,
+    "allow_thumbnails": true,
+    "thumbnail_hosts": [
+      "img.sbs.co.kr"
+    ],
+    "allow_location_mentions": true,
+    "usage": "Personal local RSS reading only.",
+    "terms_url": "https://news.sbs.co.kr/news/rss.do",
+    "checked_at": "2026-10-15"
+  },
+  "https://news.sbs.co.kr/news/SectionRssFeed.do?sectionId=07&plink=RSSREADER": {
+    "publisher": "SBS News",
+    "allow_summaries": true,
+    "allow_thumbnails": true,
+    "thumbnail_hosts": [
+      "img.sbs.co.kr"
+    ],
+    "allow_location_mentions": true,
+    "usage": "Personal local RSS reading only.",
+    "terms_url": "https://news.sbs.co.kr/news/rss.do",
+    "checked_at": "2026-10-15"
+  },
+  "https://news.sbs.co.kr/news/SectionRssFeed.do?sectionId=08&plink=RSSREADER": {
+    "publisher": "SBS News",
+    "allow_summaries": true,
+    "allow_thumbnails": true,
+    "thumbnail_hosts": [
+      "img.sbs.co.kr"
+    ],
+    "allow_location_mentions": true,
+    "usage": "Personal local RSS reading only.",
+    "terms_url": "https://news.sbs.co.kr/news/rss.do",
+    "checked_at": "2026-10-15"
+  },
+  "https://news.sbs.co.kr/news/SectionRssFeed.do?sectionId=09&plink=RSSREADER": {
+    "publisher": "SBS News",
+    "allow_summaries": true,
+    "allow_thumbnails": true,
+    "thumbnail_hosts": [
+      "img.sbs.co.kr"
+    ],
+    "allow_location_mentions": true,
+    "usage": "Personal local RSS reading only.",
+    "terms_url": "https://news.sbs.co.kr/news/rss.do",
+    "checked_at": "2026-10-15"
+  },
+  "https://www.ungeneva.org/en/news-media/press-items-list/rss.xml": {
+    "publisher": "UN Geneva",
+    "allow_summaries": true,
+    "allow_thumbnails": false,
+    "thumbnail_hosts": [],
+    "allow_location_mentions": true,
+    "usage": "RSS display with source credit.",
+    "terms_url": "https://www.ungeneva.org/en/news-media/rss",
+    "checked_at": "2026-10-15"
   }
 }

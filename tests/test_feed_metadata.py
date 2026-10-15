@@ -44,6 +44,9 @@ class FeedMetadata(unittest.TestCase):
         refs = mentioned_locations("Nigeria news: UK and US talks", geography)
         self.assertEqual({ref["country_code"] for ref in refs}, {"NG", "GB", "US"})
         self.assertEqual(plain_text("<p>Safe <b>snippet</b> &amp; text.</p><script>hidden()</script>"), "Safe snippet & text.")
+        refs = mentioned_locations("미국은 중국과 회담, 북한의 대응. 인도네시아는 방문", geography)
+        self.assertEqual({ref["country_code"] for ref in refs}, {"US", "CN", "KP", "ID"})
+        self.assertEqual(mentioned_locations("한국 소식과 인도네시아인 인터뷰", geography), [])
 
     def test_retry_only_transient_rss_transport_once(self):
         attempts = []
