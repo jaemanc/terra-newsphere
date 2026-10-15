@@ -56,9 +56,11 @@ export function decorateLayer(layer, level, globe, locale, selection) {
         return cameraHeight < 150000 && (!selection.current.adm1 || props.adm1_id === selection.current.adm1);
       }, false),
       font: level === 'country' ? '600 15px sans-serif' : '600 13px sans-serif',
-      fillColor: new Cesium.CallbackProperty(() => lightMap() ? Cesium.Color.fromCssColorString('#183b42') : lightStroke, false),
-      outlineColor: new Cesium.CallbackProperty(() => lightMap() ? Cesium.Color.WHITE : Cesium.Color.fromCssColorString('#071018'), false),
-      outlineWidth: 2,
+      fillColor: new Cesium.CallbackProperty(() => level === 'country'
+        ? Cesium.Color.fromCssColorString('#fff4cf') : lightMap() ? Cesium.Color.fromCssColorString('#183b42') : lightStroke, false),
+      outlineColor: new Cesium.CallbackProperty(() => level !== 'country' && lightMap()
+        ? Cesium.Color.WHITE : Cesium.Color.fromCssColorString('#071018'), false),
+      outlineWidth: level === 'country' ? 3 : 2,
       style: Cesium.LabelStyle.FILL_AND_OUTLINE,
       showBackground: false,
       scaleByDistance: new Cesium.NearFarScalar(100000, 1, 30000000, 0.7),
