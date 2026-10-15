@@ -2,15 +2,12 @@ import * as Cesium from 'cesium';
 import { MARKER_HEIGHT } from './map-layers.js';
 import { shortHeadline, latestNewsEntity } from './news-labels.js';
 
-const pointStyle = {
-  color: Cesium.Color.fromCssColorString('#ff932e'),
-  outlineColor: Cesium.Color.fromCssColorString('#fff4df'), outlineWidth: 2,
-};
+const RIPPLE_IMAGE = '/images/news-ripple.svg';
 const labelStyle = {
   font: '600 12px sans-serif', fillColor: Cesium.Color.WHITE,
   outlineColor: Cesium.Color.fromCssColorString('#17120d'), outlineWidth: 3,
   style: Cesium.LabelStyle.FILL_AND_OUTLINE, showBackground: false,
-  horizontalOrigin: Cesium.HorizontalOrigin.CENTER, pixelOffset: new Cesium.Cartesian2(0, -20),
+  horizontalOrigin: Cesium.HorizontalOrigin.CENTER, pixelOffset: new Cesium.Cartesian2(0, -28),
 };
 
 function headline(item, globe, locale) {
@@ -28,9 +25,12 @@ export function createNewsLayer(globe, locale) {
     if (!representative) return;
     Object.assign(cluster.label, labelStyle, {
       show: true, text: headline(representative.news, globe, locale), id: representative,
+      pixelOffset: new Cesium.Cartesian2(0, -40),
     });
-    cluster.billboard.show = false;
-    Object.assign(cluster.point, pointStyle, { show: true, id: representative, pixelSize: 22 });
+    cluster.point.show = false;
+    Object.assign(cluster.billboard, {
+      show: true, id: representative, image: RIPPLE_IMAGE, width: 68, height: 68,
+    });
     globe.scene.requestRender();
   });
   return news;
@@ -43,7 +43,7 @@ export function updateNewsLayer(layer, items, globe, locale) {
       const entity = layer.entities.add({
         id: `${item.news_id}:${index}`,
         position: Cesium.Cartesian3.fromDegrees(location.longitude, location.latitude, MARKER_HEIGHT),
-        point: { ...pointStyle, pixelSize: 12, heightReference: Cesium.HeightReference.NONE },
+        billboard: { image: RIPPLE_IMAGE, width: 44, height: 44, heightReference: Cesium.HeightReference.NONE },
         label: { ...labelStyle, text: new Cesium.CallbackProperty(() => headline(item, globe, locale), false) },
       });
       entity.news = item;
