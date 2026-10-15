@@ -20,7 +20,7 @@ export const messages = {
     unlocated: 'Location unconfirmed',
   },
   ko: {
-    eyebrow: '지금, 세계의 이야기', tagline: '모든 이야기에는 장소가 있습니다.', subtitle: '지구를 돌려 최근 7일의 뉴스를 만나보세요.',
+    eyebrow: '지금, 세계의 이야기', tagline: '지구 위의 뉴스', subtitle: '지구를 돌려 최근 7일의 뉴스를 만나보세요.',
     live: '최근 뉴스', language: '화면 언어', all: '모든 지역', region: '지역 둘러보기',
     loading: '최근 뉴스를 불러오는 중…', unavailable: '뉴스를 불러오지 못했습니다. 새로고침해 주세요.',
     empty: '현재 화면에 표시할 최근 뉴스가 없습니다.', more: '더 보기', refresh: '새로고침', stories: '개 기사 표시',
