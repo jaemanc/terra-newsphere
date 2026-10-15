@@ -12,6 +12,19 @@ from .connection import redis_client
 ROOT = Path(__file__).resolve().parents[2]
 
 
+def _decode_article(value: str | bytes | None) -> News | None:
+    if not value:
+        return None
+    data = json.loads(value)
+    if data.pop("_expires_epoch") <= time.time():
+        return None
+    data.pop("_first_epoch")
+    data.pop("_indexes")
+    if data.get("locations") == {}:
+        data["locations"] = []
+    return News.model_validate(data)
+
+
 class NewsStore:
     def __init__(self, client: Redis | None = None, geography: Geography | None = None):
         self.redis = client if client is not None else redis_client()
@@ -33,17 +46,7 @@ class NewsStore:
             article.model_dump_json(), int(article.collected_at.timestamp()), json.dumps(sorted(indexes))]))
 
     def get(self, news_id: str) -> News | None:
-        value = self.redis.get(f"news:article:{news_id}")
-        if not value:
-            return None
-        data = json.loads(value)
-        if data.pop("_expires_epoch") <= time.time():
-            return None
-        data.pop("_first_epoch")
-        data.pop("_indexes")
-        if data.get("locations") == {}:
-            data["locations"] = []
-        return News.model_validate(data)
+        return _decode_article(self.redis.get(f"news:article:{news_id}"))
 
     def list(self, country: str | None = None, adm1: str | None = None, adm2: str | None = None,
              bbox: tuple[float, float, float, float] | None = None,
@@ -67,16 +70,9 @@ class NewsStore:
         consumed = 0
         for value in pipe.execute():
             consumed += 1
-            if not value:
+            article = _decode_article(value)
+            if article is None:
                 continue
-            data = json.loads(value)
-            if data.pop("_expires_epoch") <= time.time():
-                continue
-            data.pop("_first_epoch")
-            data.pop("_indexes")
-            if data.get("locations") == {}:
-                data["locations"] = []
-            article = News.model_validate(data)
             if article.is_demo and not include_demo:
                 continue
             if bbox and not (include_unlocated and not article.locations):

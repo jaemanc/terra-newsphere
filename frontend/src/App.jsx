@@ -4,7 +4,7 @@ import { initialLocale, messages } from './i18n.js';
 import { countryName, regionName, locationName, locationsName } from './geo.js';
 import { decorateLayer, MARKER_HEIGHT } from './map-layers.js';
 import { overviewLayer, detailLayer, satellite } from './imagery.js';
-import { shortHeadline, latestNewsEntity } from './news-labels.js';
+import { createNewsLayer, updateNewsLayer } from './news-layer.js';
 
 const FALLBACK = '/images/fallback.svg';
 
@@ -160,34 +160,7 @@ export default function App() {
       globe.scene.screenSpaceCameraController.minimumZoomDistance = 15000;
       globe.scene.screenSpaceCameraController.maximumZoomDistance = 32000000;
       globe.camera.setView({ destination: Cesium.Cartesian3.fromDegrees(55, 20, 22000000) });
-      const news = new Cesium.CustomDataSource('news');
-      news.clustering.enabled = true;
-      news.clustering.pixelRange = 64;
-      news.clustering.minimumClusterSize = 2;
-      news.clustering.clusterEvent.addEventListener((entities, cluster) => {
-        const representative = latestNewsEntity(entities);
-        if (!representative) return;
-        cluster.label.show = true;
-        cluster.label.text = shortHeadline(representative.news.translations?.[mapLocale.current]?.title || representative.news.title,
-          globe.canvas.clientWidth < 600 ? 18 : 26);
-        cluster.label.id = representative;
-        cluster.label.font = '600 12px sans-serif';
-        cluster.label.fillColor = Cesium.Color.WHITE;
-        cluster.label.outlineColor = Cesium.Color.fromCssColorString('#17120d');
-        cluster.label.outlineWidth = 3;
-        cluster.label.style = Cesium.LabelStyle.FILL_AND_OUTLINE;
-        cluster.label.showBackground = false;
-        cluster.label.horizontalOrigin = Cesium.HorizontalOrigin.CENTER;
-        cluster.label.pixelOffset = new Cesium.Cartesian2(0, -20);
-        cluster.billboard.show = false;
-        cluster.point.show = true;
-        cluster.point.id = representative;
-        cluster.point.pixelSize = 22;
-        cluster.point.color = Cesium.Color.fromCssColorString('#ff932e');
-        cluster.point.outlineColor = Cesium.Color.fromCssColorString('#fff4df');
-        cluster.point.outlineWidth = 2;
-        globe.scene.requestRender();
-      });
+      const news = createNewsLayer(globe, mapLocale);
       newsResize = new ResizeObserver(() => {
         news.clustering.pixelRange = globe.canvas.clientWidth < 600 ? 80 : 64;
         globe.scene.requestRender();
@@ -401,26 +374,7 @@ export default function App() {
 
   useEffect(() => {
     if (!ready || !markers.current) return;
-    markers.current.entities.removeAll();
-    for (const item of items) {
-      item.locations.forEach((location, index) => {
-        const entity = markers.current.entities.add({ id: `${item.news_id}:${index}`,
-          position: Cesium.Cartesian3.fromDegrees(location.longitude, location.latitude, MARKER_HEIGHT),
-          point: { pixelSize: 12, color: Cesium.Color.fromCssColorString('#ff932e'),
-            outlineColor: Cesium.Color.fromCssColorString('#fff4df'), outlineWidth: 2,
-            heightReference: Cesium.HeightReference.NONE },
-          label: {
-            text: new Cesium.CallbackProperty(() => shortHeadline(item.translations?.[mapLocale.current]?.title || item.title,
-              viewer.current.canvas.clientWidth < 600 ? 18 : 26), false),
-            font: '600 12px sans-serif', fillColor: Cesium.Color.WHITE,
-            outlineColor: Cesium.Color.fromCssColorString('#17120d'), outlineWidth: 3,
-            style: Cesium.LabelStyle.FILL_AND_OUTLINE, showBackground: false,
-            horizontalOrigin: Cesium.HorizontalOrigin.CENTER, pixelOffset: new Cesium.Cartesian2(0, -20),
-          },
-        });
-        entity.news = item; entity.newsLocation = location;
-      });
-    }
+    updateNewsLayer(markers.current, items, viewer.current, mapLocale);
     // Label glyph atlases become ready after the data source's sticky ready flag.
     // Render a few frames on news changes, then return to the idle render mode.
     let frames = 0;
@@ -487,7 +441,6 @@ export default function App() {
   const title = (item) => item.translations?.[locale]?.title || item.title;
   const summary = (item) => item.translations?.[locale]?.summary || item.summary;
   const content = preview && !preview.error ? preview.content.translations?.[locale] || preview.content : null;
-  const shownItems = items;
   const mapPath = [country && countryName(country, locale),
     regionName(regions.adm1.find(item => item.region_id === adm1)?.name, locale),
     regionName(regions.adm2.find(item => item.region_id === adm2)?.name, locale)].filter(Boolean).join(' › ');
@@ -534,8 +487,8 @@ export default function App() {
         <div className="feed" aria-live="polite">
           {status === 'loading' && <p className="status">{text.loading}</p>}
           {status === 'error' && <p className="status error">{text.unavailable}</p>}
-          {status === 'ok' && !shownItems.length && <p className="status">{text.empty}</p>}
-          {shownItems.map((item) => <article className={`story ${selected?.item.news_id === item.news_id ? 'active' : ''}`} key={item.news_id}>
+          {status === 'ok' && !items.length && <p className="status">{text.empty}</p>}
+          {items.map((item) => <article className={`story ${selected?.item.news_id === item.news_id ? 'active' : ''}`} key={item.news_id}>
             <div className="story-meta"><span>{locationsName(item.locations, locale) || text.unlocated}</span>
               <a href={item.url} target="_blank" rel="noopener noreferrer">{item.publisher} ↗</a></div>
             <button className="story-open" onClick={() => {
@@ -552,7 +505,7 @@ export default function App() {
           <button disabled={status === 'loading' || pageHistory.length === 1} onClick={() => {
             const previous = pageHistory.slice(0, -1); loadNews(previous.at(-1), previous);
           }}>{text.previous}</button>
-          <span>{text.page} {pageHistory.length}<small>{shownItems.length.toLocaleString(locale)} {text.stories}</small></span>
+          <span>{text.page} {pageHistory.length}<small>{items.length.toLocaleString(locale)} {text.stories}</small></span>
           <button disabled={status === 'loading' || cursor === null} onClick={() => {
             loadNews(cursor, [...pageHistory, cursor]);
           }}>{text.next}</button>
@@ -592,7 +545,7 @@ export default function App() {
         {(view?.height < 3000000 || imageryLoading) && <div className="map-mode">{imageryUnavailable ? text.imageryFallback : imageryLoading ? text.imageryLoading : satellite ? text.satelliteMap : text.detailMap}
           {country && !manifest.current?.administrative[country] && <span>{text.countryOnly}</span>}
         </div>}
-        <div className="globe-bottom"><span>{text.instruction}</span><span className="view-count">{shownItems.length} {text.stories}</span></div>
+        <div className="globe-bottom"><span>{text.instruction}</span><span className="view-count">{items.length} {text.stories}</span></div>
       </section>
     </div>
   </main>;
