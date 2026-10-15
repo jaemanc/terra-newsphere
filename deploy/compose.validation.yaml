@@ -1,0 +1,5 @@
+# Keep live provider traffic out of the deterministic Kafka/Spark fixture check.
+# The collector image, environment, networks and ACL remain available for probes.
+services:
+  collector:
+    command: ["python", "-c", "import time; time.sleep(3600)"]
