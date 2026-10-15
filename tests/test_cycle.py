@@ -158,6 +158,18 @@ class NewsCycle(unittest.TestCase):
             self.assertEqual([item["news_id"] for item in unknown], [unlocated.news_id])
             real = client.get("/api/news/markers?include_demo=false").json()["items"]
             self.assertNotIn(demo.news_id, [item["news_id"] for item in real])
+            mapped = client.get("/api/news/markers?located_only=true&include_demo=false").json()["items"]
+            self.assertTrue(all(item["locations"] for item in mapped))
+            self.assertEqual({item["news_id"] for item in mapped},
+                             {item["news_id"] for item in real if item["locations"]})
+            page_ids = []
+            map_cursor = 0
+            while map_cursor is not None:
+                page = client.get(f"/api/news/markers?located_only=true&include_demo=false&limit=1&cursor={map_cursor}").json()
+                page_ids.extend(item["news_id"] for item in page["items"])
+                map_cursor = page["next_cursor"]
+            self.assertEqual(set(page_ids), {item["news_id"] for item in mapped})
+            self.assertEqual(len(page_ids), len(set(page_ids)))
             self.database.zadd("news:all", {"0" * 64: time.time() + 300})
             totals = client.get("/api/news/stats")
             self.assertEqual(totals.headers["cache-control"], "no-store")
