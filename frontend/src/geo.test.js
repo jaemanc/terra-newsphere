@@ -2,6 +2,36 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { locationName, locationsName, primaryLocation } from './geo.js';
 import { shortHeadline, latestNewsEntity } from './news-labels.js';
+import { demoNewsResponse } from './demo-news.js';
+
+test('standalone demo paginates fictional stories and filters the geographic hierarchy', async () => {
+  const first = await demoNewsResponse('/api/news/markers?country=KR&limit=200').json();
+  assert.equal(first.items.length, 200);
+  const second = await demoNewsResponse(`/api/news/markers?country=KR&limit=200&cursor=${first.next_cursor}`).json();
+  assert.equal(second.next_cursor, null);
+  const items = [...first.items, ...second.items];
+  assert.equal(new Set(items.map(item => item.news_id)).size, items.length);
+  assert(items.every(item => item.is_demo && item.locations.every(location => location.country_code === 'KR')));
+  const district = items.find(item => item.locations[0].adm2_id);
+  const location = district.locations[0];
+  const filtered = await demoNewsResponse(`/api/news/markers?country=KR&adm1=${location.adm1_id}&adm2=${location.adm2_id}`).json();
+  assert.deepEqual(filtered.items.map(item => item.news_id), [district.news_id]);
+  const article = await demoNewsResponse(`/api/news/${district.news_id}`).json();
+  assert.equal(article.source.url, 'https://example.com/');
+  assert(article.content.translations.ko.title.startsWith('[데모]'));
+  assert.equal(demoNewsResponse('/api/news/missing').status, 404);
+});
+
+test('demo endpoints stop returning expired examples', async () => {
+  const page = await demoNewsResponse('/api/news/markers?limit=1').json();
+  const item = page.items[0], originalNow = Date.now;
+  Date.now = () => Date.parse(item.expires_at) + 1;
+  try {
+    assert.equal((await demoNewsResponse('/api/news/stats').json()).total, 0);
+    assert.deepEqual((await demoNewsResponse('/api/news/markers').json()).items, []);
+    assert.equal(demoNewsResponse(`/api/news/${item.news_id}`).status, 404);
+  } finally { Date.now = originalNow; }
+});
 
 test('globe headlines are a single line, add literal dots only after truncation, and preserve Unicode', () => {
   assert.equal(shortHeadline('  A\nshort title  ', 20), 'A short title');
