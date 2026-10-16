@@ -113,6 +113,8 @@ frontend/public/geo/
 - When only a country is known, place its marker at the country's **capital** (as a presentation fallback, not a claim that the event happened there).
 - Do not fabricate coordinates or region IDs for ambiguous locations. Record uncertainty and avoid presenting inferred locations as exact.
 
+By explicit user request on 2026-10-13, background imagery may stream online OpenStreetMap tiles or Cesium ion imagery using a user-provided token. The global overview uses bundled NASA Blue Marble: Next Generation – Base Map (July 2004) surface tiles; do not add a cloud overlay. This exception applies only to the background map: administrative boundaries and geographic IDs remain bundled and versioned. Keep attribution visible, follow tile policies, avoid bulk downloads, and retain the local boundary fallback.
+
 ## 7. Redis-Only News Storage and 7-Day Retention
 
 - **Redis is the sole runtime datastore for news records, news indexes, and cached API results.** Do not add PostgreSQL, MySQL, MongoDB, PostGIS, or any other database.
@@ -277,3 +279,7 @@ Maintain the separation between **versioned static geography** and **ephemeral R
 ## 14. Resuming Implementation
 
 Before continuing implementation after an interruption, read `docs/implementation-progress.md`, inspect the current files and `git status`, and resume the first unfinished step. Update that document after each substantial batch of changes. Do not overwrite existing work or restart completed steps. The user requested separate top-level `kafka/`, `spark/`, and `redis/` directories, minimal abstractions, and one combined validation cycle at the end; preserve these preferences. If validation has already started, record actual results and rerun only checks affected by fixes.
+
+## 15. Branch Workflow
+
+Use `feature/<task>` branches from `dev`, merge through pull requests into `dev`, and promote tested `dev` through a pull request into `prd`. Use merge commits for promotion so long-lived branches retain shared ancestry. The default branch is `dev`; preserve `main` as historical work and do not develop on it. `prd` is reserved for production releases. There is no production server yet; current work is local development and testing only. See `docs/branching.md` for the required checks and local run procedure.

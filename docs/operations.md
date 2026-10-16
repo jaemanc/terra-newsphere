@@ -30,7 +30,7 @@ kubectl -n terra-newsphere wait --for=condition=complete job/kafka-init --timeou
 kubectl -n terra-newsphere get pods
 ```
 
-K3s 기본 Traefik과 local-path StorageClass를 전제로 한다. ingress에는 HTTPS 설정을 두고, HTTP에서 HTTPS로의 리다이렉트는 Traefik entrypoint에서 설정한다. OCI 방화벽은 웹 80/443과 필요한 관리 접근만 열고 Kafka/Redis 포트는 열지 않는다. NetworkPolicy는 같은 namespace와 kube-system ingress 경유 웹 접근만 허용한다. 설치한 CNI가 NetworkPolicy를 실제 적용하는지도 확인한다.
+K3s 기본 Traefik과 local-path StorageClass를 전제로 한다. ingress에는 HTTPS 설정을 두고, HTTP에서 HTTPS로의 리다이렉트와 HSTS는 포함된 Traefik Middleware에서 설정한다. OCI 방화벽은 웹 80/443과 필요한 관리 접근만 열고 Kafka/Redis 포트는 열지 않는다. NetworkPolicy는 기본 ingress/egress를 거부하고 필요한 서비스 연결만 허용한다. 모든 웹/API는 Traefik→nginx를 거쳐 호출 제한을 적용한다. Redis ACL Secret과 TLS 준비는 [보안 문서](security.md)를 따른다. 설치한 CNI가 NetworkPolicy를 실제 적용하는지도 확인한다.
 
 RSS는 `collector/rss-policy.json`과 `RSS_URLS`에 운영자가 확인한 피드를 설정한다. 피드별 `event_locations`는 해당 피드가 특정 보도 지역을 보장할 때만 지정하고 출판사 위치로 대체하지 않는다. 썸네일은 `allow_thumbnails: true`로 사용 권한을 확인한 피드에만 허용한다. 현재 별도 유료 API 키는 필요 없다. 추가 키는 Kubernetes Secret/env로 전달한다.
 
@@ -57,4 +57,20 @@ Vercel Functions의 Hobby 실행 한도는 현재 2GB / 1 vCPU, Fluid Compute �
 
 Services/Container Runtime beta로 여러 웹 서비스를 같은 Vercel 프로젝트에 둘 수 있다. 그러나 컨테이너도 HTTP 요청을 받는 함수이며 함수 한도가 적용되고 무요청 시 축소된다. Kafka/Redis TCP 서버와 지속 Spark 소비자를 상시 VM처럼 실행하는 배치는 이 모델에 맞지 않는다. Redis는 Marketplace의 외부 Redis Cloud/Upstash 연동을 사용할 수 있다. [Container Runtime](https://vercel.com/docs/functions/runtimes/container), [Marketplace Storage](https://vercel.com/docs/marketplace-storage).
 
-프런트만 배포한다면 root directory는 `frontend`, build는 `npm run build`, output은 `dist`다. 단, 현재 지리 생성은 아직 완료되지 않았고 `/api`를 Oracle HTTPS API로 연결하는 라우팅도 별도 설정해야 한다. 이것은 배포 방식 설명이며 현재 Vercel 배포나 라우팅 변경을 수행한 것은 아니다. Hobby는 개인·비상업 용도와 월별 전송량/요청 한도 안에서 사용한다.
+프런트만 배포한다면 root directory는 `frontend`, build는 `npm run build`, output은 `dist`다. 정적 지리 번들은 저장소에 포함돼 있으며 `/api`를 실제 HTTPS API로 연결하는 라우팅은 별도 설정해야 한다. 이것은 배포 방식 설명이며 현재 Vercel 배포나 라우팅 변경을 수행한 것은 아니다. Hobby는 개인·비상업 용도와 월별 전송량/요청 한도 안에서 사용한다.
+
+## 로컬 환경과 추가 CA
+
+README의 `sh scripts/setup.sh`는 Python/프런트 의존성과 `.env`·파생 Redis secret 파일을 준비하며 기존 지리 번들을 재사용한다. 기존 인증값은 유지한다. 비밀 파일·로컬 로그·빌드 산출물은 Git에서 제외한다.
+
+회사 네트워크 등 추가 CA가 필요한 환경에서는 이미 신뢰한 CA 파일을 BuildKit secret으로 전달한 뒤 일반 Compose 명령을 사용한다. 인증서나 개인키를 저장소에 넣지 않는다.
+
+```sh
+export TERRA_CA_CERT=/absolute/path/to/trusted-ca.crt
+export COMPOSE_FILE=compose.yaml:deploy/compose.local-ca.yaml
+docker compose up --build -d --wait
+```
+
+API·수집기·Spark 이미지는 전달된 CA를 시스템 trust store에 설치하고 프런트는 의존성 설치 단계에서 사용한다. 추가 CA가 필요 없는 환경과 CI는 기본 `compose.yaml`을 사용한다. 호스트의 uv/npm 신뢰 설정은 별도로 적용한다.
+
+빌드·설정 검사가 이미 통과한 상태에서 서비스 검사만 재개할 때는 `.venv/bin/python scripts/verify.py --containers --services-only`를 사용한다. 준비와 전체 검증을 한 번에 실행하려면 `sh scripts/complete-local.sh`를 사용한다. 이 검증은 Compose 서비스를 빌드·실행하므로 기존 로컬 서비스와 격리해 실행할 필요가 있는지 먼저 확인한다.

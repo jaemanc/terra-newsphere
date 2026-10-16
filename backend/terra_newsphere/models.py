@@ -5,7 +5,7 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
 RETENTION_SECONDS = 604800
-TRACKING_PARAMS = {"fbclid", "gclid", "mc_cid", "mc_eid"}
+TRACKING_PARAMS = {"fbclid", "gclid", "mc_cid", "mc_eid", "at_medium", "at_campaign"}
 
 
 def canonical_url(value: str) -> str:
@@ -17,8 +17,9 @@ def canonical_url(value: str) -> str:
         host = f"[{host}]"
     if parts.port and (parts.scheme, parts.port) not in {("http", 80), ("https", 443)}:
         host += f":{parts.port}"
+    tracking = TRACKING_PARAMS | ({"plink", "cooper"} if parts.hostname.lower() == "news.sbs.co.kr" else set())
     query = sorted((key, val) for key, val in parse_qsl(parts.query, keep_blank_values=True)
-                   if not key.lower().startswith("utm_") and key.lower() not in TRACKING_PARAMS)
+                   if not key.lower().startswith("utm_") and key.lower() not in tracking)
     return urlunsplit((parts.scheme.lower(), host, parts.path or "/", urlencode(query), ""))
 
 

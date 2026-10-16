@@ -4,11 +4,12 @@ import zipfile
 from urllib.parse import urlsplit
 
 from terra_newsphere.models import canonical_url
+from collector.download import download
 
 
 def enrich_locations(client, events, geography):
     by_url = {canonical_url(event["source"]["url"]): event for event in events}
-    pointer = client.get("https://data.gdeltproject.org/gdeltv2/lastupdate.txt")
+    pointer = download(client, "https://data.gdeltproject.org/gdeltv2/lastupdate.txt", max_bytes=16384)
     pointer.raise_for_status()
     files = [line.split() for line in pointer.text.splitlines()]
     candidate = next((parts for parts in files if len(parts) == 3 and parts[2].endswith(".gkg.csv.zip")), None)
@@ -21,7 +22,7 @@ def enrich_locations(client, events, geography):
     fips = geography.data.get("fips_to_iso", {})
     with tempfile.TemporaryFile() as temporary:
         size = 0
-        with client.stream("GET", url) as response:
+        with client.stream("GET", url, follow_redirects=False) as response:
             response.raise_for_status()
             for chunk in response.iter_bytes():
                 size += len(chunk)
@@ -59,4 +60,7 @@ def enrich_locations(client, events, geography):
                             reference = {"country_code": code, "role": "mentioned", "confidence": .5}
                             if code and reference not in references:
                                 references.append(reference)
-                        event["location_references"] = references[:20]
+                        for reference in references:
+                            if reference not in event["location_references"]:
+                                event["location_references"].append(reference)
+                        event["location_references"] = event["location_references"][:20]

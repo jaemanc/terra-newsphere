@@ -4,4 +4,4 @@
 
 `write_news.lua`는 최초 시각·만료를 보존하며 기사와 국가/ADM1/ADM2 인덱스를 원자적으로 갱신한다. 기사 TTL은 최초 수집 시각 + 604800초의 절대 만료다. 국가/ADM1 인덱스에는 하위 지역 기사도 연결한다. 인덱스 점수는 만료 시각이며 조회 시 오래된 연결과 없는 기사를 제외한다.
 
-외부 포트를 열지 않는다. `protected-mode no`는 격리된 내부 컨테이너 네트워크와 K3s NetworkPolicy를 전제로 하며, 인터넷에 직접 노출하면 안 된다. 정적 지리와 이미지 바이너리는 저장하지 않는다.
+Redis 7.4.11과 `protected-mode yes`, default 사용자 비활성화 및 서비스별 ACL/secret 파일을 사용한다. `python3 scripts/security_setup.py`로 로컬 비밀번호를 먼저 생성한다. frontend는 Redis 네트워크에 연결하지 않는다. 외부 포트를 열지 않으며 정적 지리와 이미지 바이너리는 저장하지 않는다. 계정별 권한과 K3s Secret 준비는 [보안 문서](../docs/security.md)를 따른다.

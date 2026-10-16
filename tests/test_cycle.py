@@ -56,6 +56,12 @@ class NewsCycle(unittest.TestCase):
         self.assertEqual(canonical_url("https://EXAMPLE.com:443/report?b=2&utm_campaign=a&a=1#top"),
                          "https://example.com/report?a=1&b=2")
         self.assertEqual(article_id("https://example.com/report?utm_source=x"), article_id("https://example.com/report"))
+        self.assertEqual(article_id("https://www.bbc.co.uk/news/articles/story?at_medium=RSS&at_campaign=rss"),
+                         article_id("https://www.bbc.co.uk/news/articles/story"))
+        self.assertEqual(article_id("https://news.sbs.co.kr/news/endPage.do?news_id=123&plink=RSSREADER&cooper=RSS"),
+                         article_id("https://news.sbs.co.kr/news/endPage.do?news_id=123"))
+        self.assertNotEqual(article_id("https://example.com/story?cooper=one"),
+                            article_id("https://example.com/story?cooper=two"))
         compressed = io.BytesIO()
         fips_code = next(code for code, iso in self.store.geography.data["fips_to_iso"].items() if iso == "KR")
         columns = ["", now.strftime("%Y%m%d%H%M%S"), "1", "example.com", "https://example.com/report", "", "", "", "", "",
@@ -72,6 +78,7 @@ class NewsCycle(unittest.TestCase):
         self.assertEqual(events[0]["location_references"][0]["country_code"], "KR")
 
         raw = events[0]
+        raw["content"].update(summary="Publisher-provided one line.", thumbnail_url="https://example.com/small.jpg")
         raw.update(schema_version=1, collected_at=(now - timedelta(hours=1)).isoformat())
         raw["location_references"] = [{"country_code": "KR", "role": "event", "confidence": .7}]
         article = normalize(raw, self.store.geography)
@@ -90,9 +97,13 @@ class NewsCycle(unittest.TestCase):
                                if value["location_type"] == "adm2")
         regional = copy.deepcopy(raw)
         regional["source"]["url"] = "https://example.com/district"
+        regional["collected_at"] = now.isoformat()
         regional["location_references"] = [{**admin, "role": "event", "confidence": .9}]
         district = normalize(regional, self.store.geography)
         self.assertTrue(self.store.save(district))
+        newest, next_cursor = self.store.list(limit=1)
+        self.assertEqual(newest[0].news_id, district.news_id)
+        self.assertEqual(self.store.list(limit=1, cursor=next_cursor)[0][0].news_id, article.news_id)
         self.assertEqual(self.store.list("KR", admin["adm1_id"], admin_id)[0][0].news_id, district.news_id)
         self.assertEqual(len(self.store.list("KR")[0]), 2)
         bad = copy.deepcopy(regional)
@@ -123,6 +134,11 @@ class NewsCycle(unittest.TestCase):
         unlocated = normalize(no_location, self.store.geography)
         self.store.save(unlocated)
         self.assertEqual(self.store.get(unlocated.news_id).locations, [])
+        demo_raw = copy.deepcopy(raw)
+        demo_raw["source"]["url"] = "https://example.com/flagged-demo"
+        demo_raw["is_demo"] = True
+        demo = normalize(demo_raw, self.store.geography)
+        self.store.save(demo)
 
         with TestClient(app) as client:
             self.assertEqual(client.get("/api/health").status_code, 200)
@@ -130,6 +146,37 @@ class NewsCycle(unittest.TestCase):
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.headers["cache-control"], "no-store")
             self.assertEqual(len(response.json()["items"]), 1)
+            marker = response.json()["items"][0]
+            self.assertEqual(marker["summary"], "Publisher-provided one line.")
+            self.assertEqual(marker["thumbnail_url"], "https://example.com/small.jpg")
+            self.assertTrue(marker["url"].startswith("https://example.com/"))
+            self.assertEqual(datetime.fromisoformat(marker["collected_at"]),
+                             self.store.get(marker["news_id"]).collected_at)
+            bbox = "bbox=0,0,1,1&include_demo=false"
+            self.assertEqual(client.get(f"/api/news/markers?{bbox}").json()["items"], [])
+            unknown = client.get(f"/api/news/markers?{bbox}&include_unlocated=true").json()["items"]
+            self.assertEqual([item["news_id"] for item in unknown], [unlocated.news_id])
+            real = client.get("/api/news/markers?include_demo=false").json()["items"]
+            self.assertNotIn(demo.news_id, [item["news_id"] for item in real])
+            mapped = client.get("/api/news/markers?located_only=true&include_demo=false").json()["items"]
+            self.assertTrue(all(item["locations"] for item in mapped))
+            self.assertEqual({item["news_id"] for item in mapped},
+                             {item["news_id"] for item in real if item["locations"]})
+            page_ids = []
+            map_cursor = 0
+            while map_cursor is not None:
+                page = client.get(f"/api/news/markers?located_only=true&include_demo=false&limit=1&cursor={map_cursor}").json()
+                page_ids.extend(item["news_id"] for item in page["items"])
+                map_cursor = page["next_cursor"]
+            self.assertEqual(set(page_ids), {item["news_id"] for item in mapped})
+            self.assertEqual(len(page_ids), len(set(page_ids)))
+            self.database.zadd("news:all", {"0" * 64: time.time() + 300})
+            totals = client.get("/api/news/stats")
+            self.assertEqual(totals.headers["cache-control"], "no-store")
+            self.assertEqual(totals.json()["total"], len(real))
+            self.assertEqual(totals.json()["located"], sum(bool(item["locations"]) for item in real))
+            self.assertTrue(totals.json()["complete"])
+            self.assertTrue(totals.json()["expires_at"])
             self.assertEqual(client.get(f"/api/news/{article.news_id}").json()["content"]["title"], "Original headline")
             self.assertEqual(client.get("/api/news/markers?adm1=unvalidated").status_code, 422)
             self.assertEqual(client.get("/api/news/markers?limit=10000").status_code, 422)
@@ -143,6 +190,7 @@ class NewsCycle(unittest.TestCase):
             self.database.zadd("news:geo:country:KR", {near_expiry.news_id: time.time() + 100})
             items = client.get("/api/news/markers?country=KR").json()["items"]
             self.assertNotIn(near_expiry.news_id, [item["news_id"] for item in items])
+            self.assertEqual(client.get("/api/news/stats").json()["total"], len(real) - 1)
 
 
 if __name__ == "__main__":

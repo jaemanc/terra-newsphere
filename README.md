@@ -1,113 +1,88 @@
 # TerraNewsphere
 
-최근 7일의 뉴스를 React/Cesium 지구에서 탐색한다. Python 수집기 → Kafka KRaft → Spark 4.0.2 `local[1]` → Redis → FastAPI로 연결한다. 뉴스는 Redis에만 저장하고, 지리 경계는 정적 파일로 배포한다.
+문의: [jaemanc93@gmail.com](mailto:jaemanc93@gmail.com)
 
-## 로컬에서 실행하기
+**지구 위의 뉴스.** 최근 7일의 뉴스를 3D 지구본에서 지역별로 탐색하는 프로젝트다. 지구를 돌려 관심 지역을 찾고, 뉴스 마커의 미리보기를 확인한 뒤 원문으로 이동한다. 뉴스 탐색 UI와 Python 스트리밍 파이프라인의 개발·학습을 목적으로 한다.
 
-프로젝트 루트에서 실행한다. Python 3.12, uv, Node.js 22 이상, 실행 중인 Docker Desktop 또는 Docker Engine + Compose가 필요하다.
+![뉴스 목록과 3D 지구본 메인 화면](docs/screenshots/01-main.png)
 
-### 1. 의존성·지리 데이터 준비
+> 화면은 2026-10-16 실제 앱에서 캡처했다. 기사·요약·기사 수는 문서용 가상 데이터이며, 썸네일은 기본 대체 이미지다. 예시 원문 링크는 `example.com`이다. [캡처 정보](docs/screenshots/README.md)
+
+## 사용법
+
+| 기능 | 사용 방법 |
+| --- | --- |
+| 지구본 탐색 | 드래그로 회전, 스크롤로 확대·축소. 왼쪽 위 버튼으로 사이드바를 접고 지도 오른쪽 위 **◎**로 초기 시점으로 돌아간다. |
+| 지역 선택 | 국가를 선택해 뉴스를 좁힌다. 한국은 확대 단계에 따라 ADM1·ADM2 경계와 행정구역 선택을 제공한다. |
+| 뉴스 미리보기 | 마커에 마우스를 올리면 썸네일·제목·제공 요약이 나타난다. 마커나 목록을 클릭하면 기사 카드가 열리고 **원문 기사 읽기**로 새 탭에서 원문을 연다. 모바일에서는 마커를 탭한다. |
+| 목록·언어 | 목록은 최대 500개씩 **이전 / 다음**으로 이동한다. 헤더에서 한국어·영어를 바꾸면 브라우저에 선택이 저장된다. 기사 번역은 저장된 번역이 있을 때만 표시한다. |
+
+**마커 읽기:** 기사당 대표 위치 하나를 표시한다. 민트색은 확인된 사건 지점, 주황색은 정확한 지점이 미확인인 위치 또는 혼합 묶음이다. 국가만 알려진 기사는 국가 안에 분산 표시하므로 실제 사건 지점으로 해석하면 안 된다. 큰 마커의 숫자는 묶인 기사 수이며 대표 기사의 미리보기가 열린다. 지도 조회는 목록 페이지와 별도이며 최대 1,000개의 위치 기사를 불러오므로 전체 보관 수와 마커 수는 다를 수 있다.
+
+<details>
+<summary>사용 화면 더 보기 — 전체 지도 · 지역 선택 · 호버 · 기사 카드 · 모바일</summary>
+
+**사이드바를 접은 전체 지도**
+
+![사이드바를 접은 지구본](docs/screenshots/02-globe.png)
+
+**한국 지역 선택과 행정구역 필터**
+
+![지역별 뉴스와 행정구역 필터](docs/screenshots/03-region.png)
+
+**마커 호버 미리보기**
+
+![썸네일과 제목 미리보기](docs/screenshots/04-hover.png)
+
+**클릭한 기사의 출처·지역·요약·원문 링크**
+
+![뉴스 기사 카드](docs/screenshots/05-article.png)
+
+**모바일 지도**
+
+<img src="docs/screenshots/06-mobile.png" alt="사이드바를 접은 모바일 지구본" width="300" />
+
+</details>
+
+## 로컬 실행
+
+Python 3.12, uv, Node.js 22 이상과 실행 중인 Docker Desktop 또는 Docker Engine + Compose가 필요하다. 프로젝트 루트에서 실행한다.
 
 ```sh
 sh scripts/setup.sh
+docker compose up --build -d --wait
 ```
 
-이 명령은 고정 의존성을 설치하고 국가 경계·한국 ADM1/ADM2·서버용 위치 매핑을 생성한다. 기존 지리 번들과 다운로드 캐시를 재사용하며, `.env`가 없을 때만 `.env.example`을 복사한다. 최초 준비에는 외부 네트워크가 필요하다. 실행 중에는 외부 지리 API를 호출하지 않는다.
-
-인증서 오류가 발생하고 검증 생략을 원하는 로컬 환경에서는 다음 명령을 사용한다.
+브라우저에서 **http://localhost:8080**을 연다. `setup.sh`가 의존성·로컬 인증값을 준비하고 기존 정적 지리 번들을 재사용한다. 최초 준비·이미지 빌드에는 인터넷 연결이 필요하다. 수집기·Kafka·Spark·Redis·API·웹이 함께 실행되며 첫 뉴스 처리까지 시간이 걸릴 수 있다.
 
 ```sh
-TERRA_SKIP_TLS_VERIFY=1 sh scripts/setup.sh
+docker compose ps                               # 서비스 상태
+docker compose logs --tail=100 collector spark   # 수집·처리 로그
+docker compose down                             # 종료
 ```
 
-이 옵션은 이번 준비 실행의 uv/npm/지리 다운로드에만 적용된다. Docker 이미지 다운로드나 이미지 내부 빌드의 인증서 설정은 별도다.
+`.env`의 `WEB_PORT`로 웹 포트를 바꿀 수 있다. 기본 웹 포트는 localhost에만 연결되며 Redis/Kafka 포트는 공개하지 않는다. **Redis는 휘발 저장이므로 재시작하면 뉴스가 사라진다.** 일반 `down`은 Kafka·Spark의 named volume을 유지한다. 사내 CA가 필요한 환경의 빌드 설정은 [운영 문서](docs/operations.md#로컬-환경과-추가-ca)를 참고한다.
 
-현재 이 작업 환경에서는 지리 다운로드가 DNS 제한으로 미완료다. 잠금 파일은 생성됐지만 정적 지리 파일은 아직 없어 **첫 실행 전에 위 준비 명령을 완료해야 한다.**
+## 구성과 데이터
 
-### 2. 화면·API와 데모 기사 실행
-
-```sh
-docker compose up --build -d --wait redis api frontend
-docker compose exec api python /app/scripts/seed_demo.py
+```mermaid
+flowchart LR
+    Feed["GDELT / RSS"] --> Collector["Python 수집기"] --> Kafka["Kafka · news.raw"]
+    Kafka --> Spark["Spark 4.0.2 · local[1]"] --> Redis["Redis · 최대 7일"] --> API["FastAPI"] --> UI["React / CesiumJS"]
+    Geo["정적 경계 / NASA 배경"] --> UI
 ```
 
-브라우저에서 **http://localhost:8080**에 접속한다. 먼저 Redis·API·프런트만 시작해 지구와 카드 동작을 확인한다. 데모는 가상 기사로 표시하며 원문 링크는 `example.com`이다. 실제 보도나 생성된 번역으로 표현하지 않는다.
+- 수집은 시작 즉시, 이후 기본 15분 간격이다. 공급자 호출 제한은 대기·재시도로 처리한다. Kafka는 입력 버퍼, Spark는 검증·정규화·지역 연결, Redis는 뉴스와 지역 색인, FastAPI는 화면 조회를 담당한다.
+- 뉴스는 **최초 수집부터 최대 604800초(7일)** 보관한다. 중복 수집으로 만료를 연장하지 않는다. 제공되지 않은 요약·번역·이미지를 만들거나 기사 전문을 수집하지 않는다.
+- 로컬 기본 RSS는 BBC·SBS·Le Monde·UN Geneva의 38개 피드다. **개인 로컬 이용 조건이며 공개·상업적 재배포 권한을 뜻하지 않는다.** 소스 추가와 썸네일 이용 조건은 [뉴스 소스 문서](docs/news-sources.md)를 따른다.
+- 국가 경계는 Natural Earth, 한국 행정 경계는 geoBoundaries를 번들한다. 전 지구 배경은 로컬 NASA Blue Marble, 확대 배경은 온라인 OSM 또는 사용자 토큰의 Cesium ion을 사용한다. 경계·배경 출처와 지원 범위는 [지리 문서](docs/geography.md)를 참고한다.
 
-### 3. Kafka·Spark 수집 파이프라인 실행
+## 검증·배포
 
-```sh
-docker compose --profile ingest up --build -d --wait
-docker compose run --rm --no-deps collector python /app/scripts/seed_demo.py --kafka
-```
+준비가 끝난 뒤 `.venv/bin/python scripts/verify.py --containers`로 프런트 빌드, 배포 설정, 격리 Redis/API·만료 검사와 실제 Kafka→Spark→Redis→HTTP 경로를 검증한다. 이 명령은 로컬 서비스를 빌드·실행하며 검증 후에도 유지한다. 수행한 결과는 [진행 기록](docs/implementation-progress.md)에 남긴다.
 
-두 번째 명령은 데모 이벤트를 Kafka에 보내 실제 Spark 처리 경로를 사용한다. Spark 이미지는 Java·PySpark·Kafka 커넥터를 준비하므로 최초 빌드가 더 오래 걸릴 수 있다.
+브랜치는 **`feature/* → dev → prd`**, 병합은 필수 CI를 통과한 PR과 merge commit을 사용한다. `prd` 반영은 운영 후보 확정이며 서버 배포 실행을 뜻하지 않는다. 현재 클라우드 서버는 없고, 배포 설정은 OCI ARM64·단일 노드 K3s용이다. 전체 구성을 1GB VM이나 정적 웹 호스팅에 그대로 올리는 용도는 아니다.
 
-수집기는 기본 15분 간격으로 GDELT DOC API를 호출하고, 최신 GKG의 동일 URL에서 국가 언급을 보완한다. 출판사 국가를 사건 위치로 사용하지 않는다. GKG 국가 언급은 불확실성을 표시하고 수도에 배치한다. 검증할 수 없는 위치는 마커로 만들지 않는다. 없는 요약·번역을 만들거나 GDELT 이미지 URL을 자동 사용하지 않는다.
+실제 `.env`·비밀번호·인증서·개인키와 로컬 실행 데이터는 Git에서 제외한다. HTTPS·Redis ACL·요청 제한·네트워크 격리는 [보안 문서](docs/security.md), 이미지·K3s 설정과 복구는 [운영 문서](docs/operations.md)를 참고한다.
 
-RSS를 추가하려면 `.env`의 `RSS_URLS`와 `collector/rss-policy.json`을 설정한다. 위치와 썸네일 정책은 해당 피드의 실제 보도 범위·사용 권한을 확인한 값만 지정한다.
-
-### 상태 확인과 종료
-
-```sh
-docker compose --profile ingest ps
-docker compose --profile ingest logs --tail=100 api collector spark
-docker compose --profile ingest down
-```
-
-`down`은 Kafka·Spark의 named volume을 유지한다. Redis는 휘발 저장이므로 재시작하면 뉴스가 사라진다. Redis/Kafka 포트는 호스트에 공개하지 않고 웹 포트만 localhost에 연결한다. 웹 포트 변경은 `.env`의 `WEB_PORT`를 사용한다.
-
-## 한 번의 최종 검증
-
-준비 명령을 완료한 뒤 실행한다.
-
-```sh
-.venv/bin/python scripts/verify.py --containers
-```
-
-Python 구문, 프런트 빌드, Compose/K3s 설정, 격리된 실제 Redis의 파싱·중복·만료·지역 조회·API, Kafka→Spark→Redis→HTTP 전달을 순서대로 확인한다. 로컬 Compose 서비스는 검증 후에도 유지한다. API 테스트에는 운영 Redis를 사용하지 않는다.
-
-이미 빌드·설정 검사가 통과했고 서비스 단계만 재개한다면 다음 명령을 사용한다.
-
-```sh
-.venv/bin/python scripts/verify.py --containers --services-only
-```
-
-준비부터 전체 검증까지 한 명령으로 실행할 수도 있다.
-
-```sh
-sh scripts/complete-local.sh
-# 로컬 인증서 검증 생략이 필요할 때
-TERRA_SKIP_TLS_VERIFY=1 sh scripts/complete-local.sh
-```
-
-현재 검증 결과는 Python 구문·프런트 빌드·Compose 설정·K3s 렌더링 통과다. Redis/Kafka/Spark 실제 연결과 WebGL 상호작용은 아직 미검증이다. 자세한 상태는 [구현 진행 기록](docs/implementation-progress.md)을 따른다.
-
-## 디렉토리
-
-```text
-backend/terra_newsphere/  기사 모델, 위치 검증, Redis 접근, FastAPI
-collector/               GDELT/RSS 수집, GKG 국가 언급 보완
-kafka/                   KRaft 배포, news.raw 생성과 보존 설정
-spark/                   단일 Spark 처리기, 체크포인트, 이미지
-redis/                   휘발 저장 설정, 원자적 기사·인덱스 갱신 Lua
-frontend/                React/Cesium UI, 정적 지리 경계
-geo/                     출처·버전·라이선스, 서버용 위치 매핑
-scripts/                 준비, 지리 가공, 데모 입력, 최종 검증
-deploy/                  Python 이미지, 단일 노드 K3s
-tests/                   핵심 Redis/API 사이클
-docs/                    데이터 계약, 지리, 운영, 재개 기록
-```
-
-## 설정 파일과 Git
-
-`.env.example`에는 안전한 기본값과 설정 이름만 저장한다. `.dockerignore`, `.gitignore`, `.env.example`, Python/npm 잠금 파일, 소스·배포·문서는 커밋한다.
-
-실제 `.env`와 환경별 env 파일, 개인키·인증서 비밀 파일, AWS 자격 증명, Kubernetes Secret 파일은 제외한다. `node_modules`, `.venv`, 캐시, 빌드 결과, 로컬 실행 로그·체크포인트도 커밋하지 않는다. 준비를 마친 정적 지리와 출처·라이선스는 버전 관리 대상이다.
-
-## 배포와 재개
-
-현재 서버 배치는 Oracle Cloud A1 ARM64 + 단일 노드 K3s를 대상으로 한다. 전체 Kafka/Spark/Redis 구성을 1코어·1GB에 정상 운영하는 것은 어렵다. Vercel에는 프런트와 FastAPI를 배포할 수 있지만 Kafka·Spark와 Redis 저장소는 별도 실행 환경이 필요하다. 실제 클라우드 배포는 아직 수행하지 않았다.
-
-배포는 [운영 문서](docs/operations.md), 저장 규칙은 [데이터 계약](docs/data-contract.md), 경계 출처·가공은 [지리 데이터](docs/geography.md)를 참고한다.
-
-중단 후에는 **“AGENTS.md와 docs/implementation-progress.md를 읽고 첫 미완료 단계부터 이어서 해줘”**라고 요청한다. 현재 준비 단계는 `.runtime/setup-stage.txt`에 기록된다.
+관련 문서: [브랜치 관리](docs/branching.md) · [데이터 계약](docs/data-contract.md) · [지리 데이터](docs/geography.md) · [뉴스 소스](docs/news-sources.md)

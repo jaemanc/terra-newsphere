@@ -11,6 +11,7 @@ resources:
   - frontend.yaml
   - network.yaml
   - ingress.yaml
+  - middleware.yaml
 configMapGenerator:
   - name: terra-config
     literals:

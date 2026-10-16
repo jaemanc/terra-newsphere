@@ -1,19 +1,67 @@
 apiVersion: apps/v1
 kind: Deployment
-metadata: {name: collector}
+metadata:
+  name: collector
 spec:
   replicas: 1
-  strategy: {type: Recreate}
-  selector: {matchLabels: {app: collector}}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: collector
   template:
-    metadata: {labels: {app: collector}}
+    metadata:
+      labels:
+        app: collector
     spec:
       containers:
-        - name: collector
-          image: terra-newsphere-collector:0.1.0
-          imagePullPolicy: IfNotPresent
-          command: [python, /app/collector/main.py]
-          envFrom: [{configMapRef: {name: terra-config}}]
-          resources:
-            requests: {cpu: 100m, memory: 96Mi}
-            limits: {cpu: 500m, memory: 256Mi}
+      - name: collector
+        image: terra-newsphere-collector:0.1.0
+        imagePullPolicy: IfNotPresent
+        command:
+        - python
+        - /app/collector/main.py
+        envFrom:
+        - configMapRef:
+            name: terra-config
+        resources:
+          requests:
+            cpu: 100m
+            memory: 96Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
+        env:
+        - name: REDIS_USERNAME
+          value: collector
+        - name: REDIS_PASSWORD_FILE
+          value: /run/secrets/redis_collector
+        volumeMounts:
+        - name: redis-secret
+          mountPath: /run/secrets
+          readOnly: true
+        - name: temporary
+          mountPath: /tmp
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 10001
+          runAsGroup: 10001
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          seccompProfile:
+            type: RuntimeDefault
+          readOnlyRootFilesystem: true
+      volumes:
+      - name: redis-secret
+        secret:
+          secretName: terra-redis-auth
+          items:
+          - key: redis_collector
+            path: redis_collector
+      - name: temporary
+        emptyDir:
+          medium: Memory
+          sizeLimit: 64Mi
+      automountServiceAccountToken: false

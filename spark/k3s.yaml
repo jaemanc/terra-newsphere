@@ -1,37 +1,88 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
-metadata: {name: spark-checkpoints}
+metadata:
+  name: spark-checkpoints
 spec:
-  accessModes: [ReadWriteOnce]
-  resources: {requests: {storage: 1Gi}}
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
 ---
 apiVersion: apps/v1
 kind: Deployment
-metadata: {name: spark}
+metadata:
+  name: spark
 spec:
   replicas: 1
-  strategy: {type: Recreate}
-  selector: {matchLabels: {app: spark}}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: spark
   template:
-    metadata: {labels: {app: spark}}
+    metadata:
+      labels:
+        app: spark
     spec:
-      securityContext: {runAsUser: 10001, runAsGroup: 10001, fsGroup: 10001}
+      securityContext:
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
       terminationGracePeriodSeconds: 30
       containers:
-        - name: spark
-          image: terra-newsphere-spark:0.1.0
-          imagePullPolicy: IfNotPresent
-          envFrom: [{configMapRef: {name: terra-config}}]
-          env:
-            - {name: SPARK_MASTER, value: "local[1]"}
-            - {name: SPARK_DRIVER_MEMORY, value: 768m}
-            - {name: SPARK_CHECKPOINT, value: /var/lib/terra/checkpoints/news}
-            - {name: SPARK_MAX_OFFSETS, value: "200"}
-            - {name: SPARK_TRIGGER_SECONDS, value: "30"}
-          resources:
-            requests: {cpu: 500m, memory: 1Gi}
-            limits: {cpu: "1", memory: 2Gi}
-          volumeMounts: [{name: checkpoints, mountPath: /var/lib/terra/checkpoints}]
-      volumes:
+      - name: spark
+        image: terra-newsphere-spark:0.1.0
+        imagePullPolicy: IfNotPresent
+        envFrom:
+        - configMapRef:
+            name: terra-config
+        env:
+        - name: SPARK_MASTER
+          value: local[1]
+        - name: SPARK_DRIVER_MEMORY
+          value: 768m
+        - name: SPARK_CHECKPOINT
+          value: /var/lib/terra/checkpoints/news
+        - name: SPARK_MAX_OFFSETS
+          value: '200'
+        - name: SPARK_TRIGGER_SECONDS
+          value: '30'
+        - name: REDIS_USERNAME
+          value: processor
+        - name: REDIS_PASSWORD_FILE
+          value: /run/secrets/redis_processor
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: '1'
+            memory: 2Gi
+        volumeMounts:
         - name: checkpoints
-          persistentVolumeClaim: {claimName: spark-checkpoints}
+          mountPath: /var/lib/terra/checkpoints
+        - name: redis-secret
+          mountPath: /run/secrets
+          readOnly: true
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 10001
+          runAsGroup: 10001
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          seccompProfile:
+            type: RuntimeDefault
+      volumes:
+      - name: checkpoints
+        persistentVolumeClaim:
+          claimName: spark-checkpoints
+      - name: redis-secret
+        secret:
+          secretName: terra-redis-auth
+          items:
+          - key: redis_processor
+            path: redis_processor
+      automountServiceAccountToken: false
