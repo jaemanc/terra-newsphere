@@ -48,7 +48,6 @@ export default function App() {
   const viewer = useRef(null);
   const markers = useRef(null);
   const countryLayer = useRef(null);
-  const focusedCountry = useRef('');
   const administrative = useRef(new Map());
   const manifest = useRef(null);
   const request = useRef(null);
@@ -67,7 +66,6 @@ export default function App() {
   }, [locale]);
 
   useEffect(() => {
-    focusedCountry.current = country;
     mapSelection.current = { country, adm1, adm2 };
     viewer.current?.scene.requestRender();
   }, [country, adm1, adm2]);
@@ -235,14 +233,7 @@ export default function App() {
             globe.scene.requestRender();
           }
           setView({ bbox: bounds, height: globe.camera.positionCartographic.height });
-          if (globe.camera.positionCartographic.height < 3000000) {
-            const center = new Cesium.Cartesian2(globe.canvas.clientWidth / 2, globe.canvas.clientHeight / 2);
-            const entity = globe.scene.pick(center)?.id;
-            const code = entity?.properties?.country_code?.getValue() || entity?.newsLocation?.country_code;
-            if (code && code !== focusedCountry.current) {
-              setCountry(code); setAdm1(''); setAdm2('');
-            }
-          }
+          // Camera motion changes the visible area, never the explicit news filters.
         }, 450);
       };
       viewUpdate.current = updateView;
