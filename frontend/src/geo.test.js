@@ -1,8 +1,39 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { runInNewContext } from 'node:vm';
 import { locationName, locationsName, primaryLocation } from './geo.js';
 import { shortHeadline, latestNewsEntity } from './news-labels.js';
 import { demoNewsResponse } from './demo-news.js';
+
+test('decluttering restores recycled labels after Cesium clears their entity ID', () => {
+  let render;
+  const style = { fillColor: 'white', outlineColor: 'black' };
+  const labels = [0, 1].map(id => ({
+    id: { id: String(id), news: {}, label: {} }, clusterShow: true, position: {},
+    computeScreenSpacePosition: () => ({}), isDestroyed: () => false,
+  }));
+  const collection = { length: 2, get: i => labels[i], isDestroyed: () => false };
+  const globe = { camera: { positionWC: {} }, canvas: { clientWidth: 800, clientHeight: 600 },
+    scene: { postRender: { addEventListener: fn => { render = fn; } }, requestRender() {} } };
+  const Cesium = {
+    EllipsoidalOccluder: class { isPointVisible() { return true; } }, Ellipsoid: { WGS84: {} },
+    Cartesian3: { distanceSquared: () => 1 }, Color: { TRANSPARENT: 'transparent' },
+    Label: { getScreenSpaceBoundingBox: () => ({ x: 10, y: 10, width: 100, height: 20 }) },
+  };
+  const source = readFileSync(new URL('./headline-declutter.js', import.meta.url), 'utf8')
+    .replace(/^import .*;\n/gm, '').replace('export function', 'function');
+  const declutter = runInNewContext(`${source}\ndeclutterHeadlines`, {
+    Cesium, labelStyle: style, visibleHeadlines,
+  });
+  declutter(globe, { clustering: { _labelCollection: collection } });
+  render();
+  assert.equal(labels[1].fillColor, 'transparent');
+  // EntityCluster returns removed labels to its pool and clears their IDs.
+  labels[1].id = undefined;
+  assert.doesNotThrow(() => render());
+  assert.equal(labels[1].fillColor, 'white');
+  assert.equal(labels[0].id.label.fillColor, 'white');
+});
 
 test('standalone demo paginates fictional stories and filters the geographic hierarchy', async () => {
   const first = await demoNewsResponse('/api/news/markers?country=KR&limit=200').json();
