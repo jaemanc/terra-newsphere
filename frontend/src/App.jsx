@@ -7,8 +7,10 @@ import { overviewLayer, detailLayer, satellite } from './imagery.js';
 import { createNewsLayer, updateNewsLayer } from './news-layer.js';
 import { countryAreas, markerPosition, uncertainLocation } from './marker-placement.js';
 import { declutterHeadlines } from './headline-declutter.js';
+import { assetUrl } from './paths.js';
+import { demoMode, newsRequest } from './news-data.js';
 
-const FALLBACK = '/images/fallback.svg';
+const FALLBACK = assetUrl('images/fallback.svg');
 
 function Thumbnail({ url, className }) {
   return <img className={className} src={url || FALLBACK} alt="" loading="lazy"
@@ -181,8 +183,8 @@ export default function App() {
       markers.current = news;
       globe.dataSources.add(news);
       Promise.all([
-        fetch('/geo/manifest.json').then((response) => { if (!response.ok) throw new Error(); return response.json(); }),
-        fetch('/geo/countries.geojson').then((response) => { if (!response.ok) throw new Error(); return response.json(); }),
+        fetch(assetUrl('geo/manifest.json')).then((response) => { if (!response.ok) throw new Error(); return response.json(); }),
+        fetch(assetUrl('geo/countries.geojson')).then((response) => { if (!response.ok) throw new Error(); return response.json(); }),
       ]).then(async ([index, boundaries]) => {
         if (!alive) return;
         manifest.current = index;
@@ -277,7 +279,7 @@ export default function App() {
         const key = `${country}:${current}`;
         let layer = administrative.current.get(key);
         if (!layer) {
-          const response = await fetch(`/geo/${files[current]}`);
+          const response = await fetch(assetUrl(`geo/${files[current]}`));
           if (!response.ok) throw new Error('Boundary unavailable');
           const data = await response.json();
           next[current] = data.features.map((feature) => feature.properties);
@@ -324,7 +326,7 @@ export default function App() {
       do {
         params.set('cursor', String(data.next_cursor));
         params.set('limit', String(Math.min(200, 500 - data.items.length)));
-        const response = await fetch(`/api/news/markers?${params}`, { signal: controller.signal, cache: 'no-store' });
+        const response = await newsRequest(`/api/news/markers?${params}`, { signal: controller.signal, cache: 'no-store' });
         if (!response.ok) throw new Error();
         const page = await response.json();
         pages += 1;
@@ -369,7 +371,7 @@ export default function App() {
       for (let pages = 0; pages < 10 && cursor !== null && next.size < 1000; pages++) {
         params.set('cursor', String(cursor));
         params.set('limit', String(Math.min(200, 1000 - next.size)));
-        const response = await fetch(`/api/news/markers?${params}`, { signal: controller.signal, cache: 'no-store' });
+        const response = await newsRequest(`/api/news/markers?${params}`, { signal: controller.signal, cache: 'no-store' });
         if (!response.ok) throw new Error();
         const data = await response.json();
         for (const item of data.items) next.set(item.news_id, item);
@@ -389,7 +391,7 @@ export default function App() {
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch('/api/news/stats', { signal: controller.signal, cache: 'no-store' })
+    newsRequest('/api/news/stats', { signal: controller.signal, cache: 'no-store' })
       .then((response) => { if (!response.ok) throw new Error(); return response.json(); })
       .then(setOverview).catch((error) => { if (error.name !== 'AbortError') setOverview(null); });
     return () => controller.abort();
@@ -440,7 +442,7 @@ export default function App() {
     setPreview(null);
     if (!selected) return;
     const controller = new AbortController();
-    fetch(`/api/news/${selected.item.news_id}`, { signal: controller.signal, cache: 'no-store' })
+    newsRequest(`/api/news/${selected.item.news_id}`, { signal: controller.signal, cache: 'no-store' })
       .then((response) => { if (!response.ok) throw new Error(); return response.json(); })
       .then(setPreview).catch((error) => { if (error.name !== 'AbortError') setPreview({ error: true }); });
     return () => controller.abort();
@@ -521,13 +523,14 @@ export default function App() {
             <path d={sidebarOpen ? 'm16 9-3 3 3 3' : 'm13 9 3 3-3 3'} />
           </svg>
         </button>
-        <a className="brand" href="/" aria-label="TerraNewsphere"><span className="brand-icon">◎</span> TERRA<span>NEWS</span>PHERE</a>
+        <a className="brand" href={import.meta.env.BASE_URL} aria-label="TerraNewsphere"><span className="brand-icon">◎</span> TERRA<span>NEWS</span>PHERE</a>
       </div>
-      <div className="top-actions"><span className="live-indicator"><i />{text.live}</span>
+      <div className="top-actions"><span className="live-indicator"><i />{demoMode ? text.demo : text.live}</span>
         <select aria-label={text.language} value={locale} onChange={(event) => setLocale(event.target.value)}>
           <option value="en">English</option><option value="ko">한국어</option>
         </select></div>
     </header>
+    {demoMode && <p className="demo-notice" role="status">{text.demoNotice}</p>}
     <div className="workspace">
       <aside id="news-sidebar" className="sidebar" hidden={!sidebarOpen}>
         <div className="eyebrow">{text.eyebrow}</div>
@@ -573,7 +576,7 @@ export default function App() {
             loadNews(cursor, [...pageHistory, cursor]);
           }}>{text.next}</button>
         </nav>
-        <a className="attribution" href="/geo/manifest.json" target="_blank" rel="noopener noreferrer">{text.attribution} ↗</a>
+        <a className="attribution" href={assetUrl('geo/manifest.json')} target="_blank" rel="noopener noreferrer">{text.attribution} ↗</a>
       </aside>
       <section className="globe-stage" aria-label="Interactive news globe">
         <div ref={host} className="globe-layer" />
@@ -603,7 +606,7 @@ export default function App() {
             {selected.location && <small>{selected.location.coordinate_source === 'capital_fallback' ? text.distributed : selected.location.coordinate_source === 'verified_place' ? (uncertainLocation(selected.location) ? text.uncertainMarker : text.confirmedMarker) : text.centroid}</small>}
             {selected.location?.association_kind === 'mentioned' && <small>{text.mentioned}</small>}
             {preview && !preview.error && <><small>{text.original}: {preview.content.language}</small>
-              <a href={preview.source.url} target="_blank" rel="noopener noreferrer">{text.source} ↗</a></>}
+              <a href={preview.source.url} target="_blank" rel="noopener noreferrer">{demoMode ? text.demoSource : text.source} ↗</a></>}
           </div>
         </article>}
         {(view?.height < 3000000 || imageryLoading) && <div className="map-mode">{imageryUnavailable ? text.imageryFallback : imageryLoading ? text.imageryLoading : satellite ? text.satelliteMap : text.detailMap}

@@ -13,6 +13,7 @@
 .runtime
 **/node_modules
 **/dist
+**/dist-demo
 frontend/public/cesium
 **/__pycache__
 geo/raw
