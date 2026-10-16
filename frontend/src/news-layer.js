@@ -6,7 +6,7 @@ import { markerPosition, uncertainLocation } from './marker-placement.js';
 
 const RIPPLE_IMAGE = '/images/news-ripple.svg';
 const UNCERTAIN_IMAGE = '/images/news-ripple-uncertain.svg';
-const labelStyle = {
+export const labelStyle = {
   font: '600 12px sans-serif', fillColor: Cesium.Color.WHITE,
   outlineColor: Cesium.Color.fromCssColorString('#17120d'), outlineWidth: 3,
   style: Cesium.LabelStyle.FILL_AND_OUTLINE, showBackground: false,
