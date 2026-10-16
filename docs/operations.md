@@ -1,5 +1,13 @@
 # 단일 OCI ARM64 서버 운영
 
+## GitHub Pages 체험용 데모
+
+`https://jaemanc.github.io/terra-newsphere/`는 가상 기사만 표시하는 독립 프런트 데모다. 실제 기사·Redis·FastAPI·수집기와 연결하지 않으며, 상단 안내와 기사 출처에 데모임을 표시한다. 기존 일반 빌드는 실뉴스 API를 계속 사용한다.
+
+`.github/workflows/pages.yml`은 `prd`의 프런트 변경을 받아 `npm --prefix frontend run build:demo`로 `frontend/dist-demo`를 만든 뒤 Pages에 배포한다. 수동 실행도 `prd`에서만 배포할 수 있다. 이 모드의 기본 경로는 `/terra-newsphere/`이며 Cesium·경계·배경·마커 파일을 같은 경로에서 불러온다. GitHub `github-pages` 환경의 허용 브랜치는 `prd`다.
+
+예시 위치는 기존 버전 관리된 지리 매핑에서 가져온 `frontend/src/demo-locations.json`을 사용한다. 가상 기사 제목·요약·날짜는 브라우저에서 생성하고 예시 링크는 `example.com`으로 연결한다. 이는 실제 뉴스의 정적 내보내기나 백업이 아니다.
+
 ## 배포 전 준비
 
 대상은 OCI A1 ARM64, Ubuntu 26.04 LTS, 단일 노드 K3s다. VM의 실제 CPU/RAM/디스크를 확인해 설정을 조정한다. 현재 컨테이너 limit는 API 256MiB, 수집기 256MiB, Redis 384MiB, Kafka 1GiB, Spark 2GiB, frontend 128MiB다. 이는 초기 설정값이며 K3s·OS·페이지 캐시와 이미지 빌드 작업의 추가 공간/메모리가 필요하다. 실제 서버에서 프로파일링하기 전 용량 보장을 의미하지 않는다.

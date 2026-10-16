@@ -1,10 +1,14 @@
 # TerraNewsphere
 
+**[Open demo / 데모 페이지 열기](https://jaemanc.github.io/terra-newsphere/)** — Interactive globe with fictional stories / 가상 뉴스로 체험하는 지구본
+
 Contact / 문의: [jaemanc93@gmail.com](mailto:jaemanc93@gmail.com) · [English](#english) · [한국어](#한국어)
 
 ## English
 
 **News around the globe.** Explore the last seven days of news on an interactive 3D Earth. Rotate the globe, choose a region, preview a story and follow its original link. This project combines a news discovery UI with a Python streaming pipeline for development and learning.
+
+The linked GitHub Pages demo runs entirely in the browser with fictional stories and a visible demo notice. It does not connect to the live-news backend or Redis. The regular local build continues to use FastAPI and Redis.
 
 ![News-rich globe overview with a sidebar and regional story markers](docs/screenshots/07-news-overview.png)
 
@@ -58,7 +62,7 @@ flowchart LR
 
 After setup, run `.venv/bin/python scripts/verify.py --containers` to check the frontend build, deployment configuration, isolated Redis/API retention behavior and the Kafka→Spark→Redis→HTTP pipeline. It builds/starts local services and leaves them running. Actual results are recorded in the [implementation log](docs/implementation-progress.md).
 
-Branches follow **`feature/* → dev → prd`** through PRs with required CI and merge commits. `prd` is a release candidate branch; merging it does not deploy a server. No cloud server is currently deployed. Manifests target OCI ARM64 with single-node K3s; this full stack is not intended for a 1GB VM or static-only hosting.
+Branches follow **`feature/* → dev → prd`** through PRs with required CI and merge commits. Frontend changes in `prd` publish the standalone demo to GitHub Pages; the live-news backend is not publicly deployed. Manifests target OCI ARM64 with single-node K3s; this full stack is not intended for a 1GB VM or static-only hosting. Run `npm --prefix frontend run build:demo` to build the standalone demo locally.
 
 Keep real `.env` files, credentials, certificates, keys and runtime data out of Git. See [security](docs/security.md) for HTTPS, Redis ACLs, request limits and network isolation, and [operations](docs/operations.md) for deployment and recovery.
 
@@ -97,6 +101,8 @@ Keep real `.env` files, credentials, certificates, keys and runtime data out of 
 
 **지구 위의 뉴스.** 최근 7일의 뉴스를 3D 지구본에서 지역별로 탐색하는 프로젝트다. 관심 지역을 찾고 뉴스 미리보기를 확인한 뒤 원문으로 이동한다. 뉴스 탐색 UI와 Python 스트리밍 파이프라인의 개발·학습을 목적으로 한다.
 
+맨 위 GitHub Pages 링크는 가상 뉴스와 데모 안내를 표시하는 체험 페이지다. 브라우저에서만 동작하며 실뉴스 서버나 Redis에 접속하지 않는다. 일반 로컬 실행은 기존 FastAPI·Redis 구성을 사용한다.
+
 위의 뉴스가 많은 화면과 접을 수 있는 갤러리에는 실제 앱 캡처 7장이 있다. **기사·요약·기사 수는 문서용 가상 데이터**이며 실제 보도가 아니다. 이미지는 기본 대체 이미지, 예시 원문 링크는 `example.com`이다. [캡처 정보](docs/screenshots/README.md)
 
 ### 사용법
@@ -134,7 +140,7 @@ docker compose up --build -d --wait
 
 준비 후 `.venv/bin/python scripts/verify.py --containers`로 프런트 빌드·배포 설정·격리 Redis/API·만료·실제 파이프라인을 검증한다. 로컬 서비스를 빌드·실행하며 검증 후에도 실행 상태를 유지한다. 실제 결과는 [진행 기록](docs/implementation-progress.md)에 남긴다.
 
-브랜치는 **`feature/* → dev → prd`**, 병합은 필수 CI를 통과한 PR과 merge commit을 사용한다. `prd` 반영은 운영 후보 확정이며 서버 배포 실행을 뜻하지 않는다. 현재 클라우드 서버는 없고 배포 설정은 OCI ARM64·단일 노드 K3s용이다. 전체 구성을 1GB VM이나 정적 웹 호스팅에 그대로 올리는 용도는 아니다.
+브랜치는 **`feature/* → dev → prd`**, 병합은 필수 CI를 통과한 PR과 merge commit을 사용한다. `prd`의 프런트 변경은 GitHub Pages 데모를 배포하며 실뉴스 서버는 공개 배포하지 않았다. 실뉴스 배포 설정은 OCI ARM64·단일 노드 K3s용이다. 전체 구성을 1GB VM이나 정적 웹 호스팅에 그대로 올리는 용도는 아니다. 데모만 빌드하려면 `npm --prefix frontend run build:demo`를 실행한다.
 
 실제 `.env`·비밀번호·인증서·개인키와 로컬 실행 데이터는 Git에서 제외한다. HTTPS·Redis ACL·요청 제한·네트워크 격리는 [보안 문서](docs/security.md), 배포·복구는 [운영 문서](docs/operations.md)를 참고한다.
 
