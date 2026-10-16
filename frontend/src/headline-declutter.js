@@ -36,7 +36,7 @@ export function declutterHeadlines(globe, layer) {
       const show = visible.has(label);
       label.fillColor = show ? labelStyle.fillColor : Cesium.Color.TRANSPARENT;
       label.outlineColor = show ? labelStyle.outlineColor : Cesium.Color.TRANSPARENT;
-      if (singles.has(label)) {
+      if (singles.has(label) && label.id?.label) {
         label.id.label.fillColor = label.fillColor;
         label.id.label.outlineColor = label.outlineColor;
       }
@@ -47,7 +47,8 @@ export function declutterHeadlines(globe, layer) {
       if (!nextHidden.has(label) && !label.isDestroyed()) {
         label.fillColor = labelStyle.fillColor;
         label.outlineColor = labelStyle.outlineColor;
-        if (singles.has(label)) {
+        // Cesium clears pooled labels' IDs when entities are removed or reclustered.
+        if (singles.has(label) && label.id?.label) {
           label.id.label.fillColor = labelStyle.fillColor;
           label.id.label.outlineColor = labelStyle.outlineColor;
         }
