@@ -6,6 +6,7 @@ import { decorateLayer, MARKER_HEIGHT } from './map-layers.js';
 import { overviewLayer, detailLayer, satellite } from './imagery.js';
 import { createNewsLayer, updateNewsLayer } from './news-layer.js';
 import { countryAreas, markerPosition, uncertainLocation } from './marker-placement.js';
+import { declutterHeadlines } from './headline-declutter.js';
 
 const FALLBACK = '/images/fallback.svg';
 
@@ -77,6 +78,7 @@ export default function App() {
     let removeMove;
     let newsResize;
     let removeReadyRender;
+    let removeHeadlineDeclutter;
     let removeImageryError;
     let removeImageryRender;
     let detail;
@@ -167,6 +169,7 @@ export default function App() {
       globe.scene.screenSpaceCameraController.maximumZoomDistance = 32000000;
       globe.camera.setView({ destination: Cesium.Cartesian3.fromDegrees(55, 20, 22000000) });
       const news = createNewsLayer(globe, mapLocale);
+      removeHeadlineDeclutter = declutterHeadlines(globe, news);
       newsResize = new ResizeObserver(() => {
         globe.resize();
         news.clustering.pixelRange = globe.canvas.clientWidth < 600 ? 8 : 6;
@@ -250,6 +253,7 @@ export default function App() {
     return () => {
       alive = false; clearTimeout(timer); removeMove?.(); newsResize?.disconnect(); handler?.destroy();
       removeReadyRender?.();
+      removeHeadlineDeclutter?.();
       removeImageryError?.();
       removeImageryRender?.();
       if (globe && !globe.isDestroyed()) globe.destroy();

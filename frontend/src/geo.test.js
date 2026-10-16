@@ -78,3 +78,14 @@ test('country-only display points are stable, varied, inside land and outside ho
   const point=markerPosition({news_id:'france'},france,realAreas);
   assert(point.longitude>-6&&point.longitude<10&&point.latitude>41&&point.latitude<52);
 });
+
+import { visibleHeadlines } from './headline-visibility.js';
+test('overlapping headlines keep the nearest, then newest; separated titles return on zoom', () => {
+  const make=(id,x,distance,timestamp=0)=>({id,label:id,bounds:{x,y:10,width:100,height:20},distance,timestamp});
+  const far=make('far',0,20,100), near=make('near',30,10), separate=make('separate',200,50);
+  assert.deepEqual([...visibleHeadlines([far,near,separate])],['near','separate']);
+  assert.deepEqual([...visibleHeadlines([make('old',0,10,1),make('new',0,10,2)])],['new']);
+  assert.equal(visibleHeadlines([far,{...near,bounds:{...near.bounds,x:110}},separate]).size,2);
+  assert.equal(visibleHeadlines([far,{...near,bounds:{...near.bounds,x:100}},make('separate',200,50)]).size,3);
+  assert.deepEqual([...visibleHeadlines([])],[]);
+});
