@@ -432,5 +432,15 @@
     "usage": "RSS display with source credit.",
     "terms_url": "https://www.ungeneva.org/en/news-media/rss",
     "checked_at": "2026-10-15"
+  },
+  "https://www.lemonde.fr/en/artificial-intelligence/rss_full.xml": {
+    "publisher": "Le Monde",
+    "allow_summaries": true,
+    "allow_thumbnails": false,
+    "thumbnail_hosts": [],
+    "allow_location_mentions": true,
+    "usage": "Personal local RSS reading of the official Artificial Intelligence section; titles, supplied snippets and original links only. No commercial/collective redistribution grant or images.",
+    "terms_url": "https://www.lemonde.fr/en/about-us/article/2026/03/27/le-monde-rss-feeds_6751860_115.html",
+    "checked_at": "2026-10-19"
   }
 }

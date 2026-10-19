@@ -10,7 +10,7 @@ Every initial and recurring event follows collector → `news.raw` → single lo
 
 ## Local supplementary RSS feeds
 
-Local Compose and `.env.example` configure 38 official feeds, including 20 BBC News feeds: world, Asia, Europe, US/Canada, Africa, Middle East, Latin America, business, technology, science/environment, UK, health, politics, education, entertainment/arts, England, Scotland, Wales, Northern Ireland and BBC Verify. `RSS_URLS` can override the set; an explicitly empty value disables RSS. Kubernetes has no BBC default; choose licensed sources for its intended use.
+Local Compose and `.env.example` configure 39 official feeds, including 20 BBC News feeds: world, Asia, Europe, US/Canada, Africa, Middle East, Latin America, business, technology, science/environment, UK, health, politics, education, entertainment/arts, England, Scotland, Wales, Northern Ireland and BBC Verify. `RSS_URLS` can override the set; an explicitly empty value disables RSS. Kubernetes has no BBC default; choose licensed sources for its intended use.
 
 Checked 2026-10-14 against the live [BBC terms](https://www.bbc.com/pages/terms-of-use), section **Metadata and RSS feeds**, and the feed's own copyright/terms link. BBC permits individuals to display its News RSS feed with unchanged supplied material and a prominent BBC News credit/link. Business use requires permission/licensing. These are personal local development defaults, not a grant for commercial redistribution. Keep the supplied headline, short description and original media thumbnail URL; do not scrape article bodies or increase thumbnail resolution. The visible card includes the original article link labelled BBC News. The source check and allowed thumbnail host `ichef.bbci.co.uk` are recorded in `collector/rss-policy.json`.
 
@@ -31,3 +31,19 @@ An exact, unambiguous country name in a supplied headline/description can create
 These are not precise event locations. Country-only news uses the validated capital presentation fallback and displays the uncertainty in its preview. Do not manufacture administrative IDs or exact city coordinates. Articles with no confirmed association remain visible in the global list as **Location unconfirmed**, with an unanchored preview and no globe marker. Region-filtered lists continue to use actual validated region indexes.
 
 The UI requests `include_demo=false` so fixtures never inflate real news counts. API defaults remain backward compatible for pipeline verification; demo records are always explicitly flagged. Marker responses include source URL and a provided short summary. Lists return up to 200 per response in latest-collection order. The browser displays one page of up to 500 items through at most three sequential requests. Previous/Next navigation can reach older articles without silently dropping them from an appended list. Refresh keeps the current page; changing the geographic filter starts again at page one. The prominent count comes from `/api/news/stats` for all stored, live, non-demo records, separately from the current page count. Stats inspect up to 10,000 candidates in batches of 500 and explicitly return a lower bound above that budget; missing keys and expired records never count. Orange markers and clusters carry a single-line original/available translated headline (26 characters, 18 on mobile); truncated text ends with literal `...`. A cluster previews its latest dated article, using collection time when publication time is unavailable. Its caption and point open the same real article, with the existing source and uncertainty information. No view counts are invented.
+
+
+## AI-focused RSS addition (2026-10-19)
+
+The local feed set adds [Le Monde Artificial Intelligence](https://www.lemonde.fr/en/artificial-intelligence/rss_full.xml), a dedicated AI news section listed on its [official RSS page](https://www.lemonde.fr/en/about-us/article/2026/03/27/le-monde-rss-feeds_6751860_115.html). This raises the enabled feed count from 38 to 39. The existing personal-local reading scope applies: original titles, supplied short snippets and source links only, no images or commercial redistribution grant. The 900-second post-cycle interval, canonical URL deduplication and first-collection seven-day expiry are unchanged.
+
+The feed and its robots rules were checked live, and the deployed collector successfully published six recent candidates. These are candidates, not guaranteed new unique records: other Le Monde sections may overlap and remain deduplicated.
+
+Other AI-focused candidates were evaluated but not enabled:
+
+- [TechAmerica.ai RSS terms](https://techamerica.ai/rss-terms) allow attributed noncommercial headline/short-summary display, and a manual feed check returned 30 entries (13 recent). However, the actual collector received HTTP 403. Remove it from the active configuration rather than bypass automated-access restrictions.
+- AI Times, THE DECODER and TechForge AI News: sufficient feed redistribution permission was not established.
+- MIT News: RSS syndication requires author/republication attribution that the current preview does not preserve; defer until those requirements can be met.
+- AI News Circle: no usable feed entries. BAIR: no available entries from the past seven days.
+
+RSS availability alone is not treated as a redistribution license. Locations still come from validated article mentions, never publisher nationality. Existing Le Monde and new AI section use the same original-URL article IDs.
